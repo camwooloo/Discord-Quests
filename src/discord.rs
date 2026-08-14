@@ -108,17 +108,31 @@ impl DiscordClient {
         let nameplate = me["collectibles"]["nameplate"]["asset"].as_str().map(|a| {
             format!("https://cdn.discordapp.com/assets/collectibles/{a}static.png")
         });
-        // Resolve the equipped profile effect via the catalog: its animated layer
-        // sources (APNG) so the effect actually plays (best-effort).
-        let effect_anim = up["profile_effect"]["sku_id"].as_str().and_then(|sku| {
-            self.fetch_catalog().ok()
-                .and_then(|c| serde_json::from_str::<Value>(&c).ok())
-                .and_then(|items| {
-                    items.as_array()?.iter()
-                        .find(|it| it["sku"].as_str() == Some(sku))
-                        .map(|it| it["anim"].clone())
-                })
-        }).unwrap_or(Value::Null);
+        // Resolve equipped profile effect (animated) and profile frame (layers +
+        // geometry) against the catalog — best-effort, one catalog fetch.
+        let catalog: Vec<Value> = self
+            .fetch_catalog()
+            .ok()
+            .and_then(|c| serde_json::from_str::<Value>(&c).ok())
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default();
+        let find = |sku: &str| catalog.iter().find(|it| it["sku"].as_str() == Some(sku));
+        let effect_anim = up["profile_effect"]["sku_id"]
+            .as_str()
+            .and_then(|sku| find(sku).map(|it| it["anim"].clone()))
+            .unwrap_or(Value::Null);
+        let (mut frame_layers, mut frame_metrics) = (Value::Null, Value::Null);
+        if let Some(cols) = me["collectibles"].as_object() {
+            for v in cols.values() {
+                if let Some(it) = v["sku_id"].as_str().and_then(&find) {
+                    if it["kind"].as_str() == Some("frame") {
+                        frame_layers = it["layers"].clone();
+                        frame_metrics = it["metrics"].clone();
+                        break;
+                    }
+                }
+            }
+        }
         fn hexc(v: &Value) -> Option<String> {
             v.as_u64().map(|n| format!("#{:06x}", n & 0xff_ffff))
         }
@@ -139,6 +153,7 @@ impl DiscordClient {
             "username": me["username"],
             "avatar": avatar, "banner": banner, "decoration": deco,
             "nameplate": nameplate, "effectAnim": effect_anim,
+            "frameLayers": frame_layers, "frameMetrics": frame_metrics,
             "themeA": hexc(&up["theme_colors"][0]), "themeB": hexc(&up["theme_colors"][1]),
             "nameColors": ncolors,
             "pronouns": up["pronouns"].as_str().unwrap_or(""),
@@ -357,6 +372,19 @@ impl DiscordClient {
                 } else {
                     None
                 };
+                // Frame geometry: how far the frame extends past the profile on
+                // each side, so the preview can inset the card into the frame's
+                // window instead of laying the frame on top of it.
+                let metrics = if ptype == 3 {
+                    Some(json!({
+                        "iw": item0["inner_width"].as_i64().unwrap_or(1200),
+                        "ot": item0["overflow_top"].as_i64().unwrap_or(0),
+                        "ob": item0["overflow_bottom"].as_i64().unwrap_or(0),
+                        "oh": item0["overflow_horizontal"].as_i64().unwrap_or(0),
+                    }))
+                } else {
+                    None
+                };
                 // Effects animate: carry the animated layer sources (APNG) so the
                 // preview plays them instead of the static thumbnail.
                 let anim = if ptype == 1 {
@@ -388,6 +416,7 @@ impl DiscordClient {
                     "kind": kind(ptype),
                     "image": image,
                     "layers": layers,
+                    "metrics": metrics,
                     "anim": anim,
                     "orbs": orbs,
                     "collection": cat_name,

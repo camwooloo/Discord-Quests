@@ -606,7 +606,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .colclr:hover{background:var(--glass-2);color:var(--text)}
 /* live profile preview */
 /* the theme's two colours tint the profile body (under the banner), not the banner */
-.ppreview{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--stroke);min-height:520px;--pt:#232428;--pt2:#232428;
+.ppreview{position:relative;z-index:1;border-radius:16px;overflow:hidden;border:1px solid var(--stroke);min-height:520px;--pt:#232428;--pt2:#232428;
   background:linear-gradient(180deg,color-mix(in srgb,var(--pt) 55%,#0e0f16),color-mix(in srgb,var(--pt2) 55%,#0e0f16))}
 .ppreview.pp-sticky{transition:box-shadow .2s var(--ease)}
 .ppreview.pp-static .pp-av{cursor:default}
@@ -614,7 +614,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .studio-top{position:relative;min-height:560px;margin-bottom:6px}
 .studio-preview{max-width:560px}
 /* tucked: taller top-right popout while scrolling; click returns to top */
-.ppreview.tucked{position:fixed;top:54px;right:24px;width:292px;min-height:0;max-height:calc(100vh - 88px);overflow:auto;
+.ppreview.tucked{position:fixed;top:54px;right:24px;width:292px;min-height:0;max-height:calc(100vh - 88px);overflow:auto;margin:0!important;
   z-index:60;cursor:pointer;border-color:rgba(var(--accent-rgb),.55);box-shadow:0 24px 60px -12px rgba(0,0,0,.7)}
 .ppreview.tucked .pp-btns,.ppreview.tucked .pp-hint{display:none}
 .ppreview.tucked .pp-banner{height:96px}
@@ -631,9 +631,12 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .pp-effect{position:absolute;inset:0;z-index:4;background:center/cover no-repeat;pointer-events:none;mix-blend-mode:screen;opacity:.9;display:none}
 .pp-effect .fx-layer{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pp-banner{height:150px;background:linear-gradient(145deg,#41445a,#2a2c38) center/cover no-repeat;z-index:0}
+/* frame wraps AROUND the card: the card is margined into the frame's window,
+   the frame fills the wrapper. Back layers behind the card, front in front. */
+.pp-wrap{position:relative}
 .pp-frame{position:absolute;inset:0;pointer-events:none;display:none}
-.pp-frame.back{z-index:1}
-.pp-frame.front{z-index:8}
+.pp-frame.back{z-index:0}
+.pp-frame.front{z-index:2}
 .pp-frame .fl{position:absolute;left:0;width:100%;height:auto}
 .pp-frame .fl-top{top:0}
 .pp-frame .fl-bottom{bottom:0}
@@ -934,6 +937,11 @@ let ORBS=null, BADGES=null, STATS=null, EQUIPPED=null, HISTORY=null, navInit=fal
 let APP_VERSION='', changelogShown=false;
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.2',d:'15 Aug 2026',notes:[
+    'Profile frames now wrap correctly around the profile (inset into the frame window) instead of sitting on top',
+    'Your equipped frame now shows on the Home profile too',
+    'The new Account Age, Streaming, Game Variety & Game Time badges light up automatically the moment Discord rolls them out to you',
+  ]},
   {v:'0.3.1',d:'14 Aug 2026',notes:[
     'Profile theme is now a full colour picker and tints your profile (under the banner), like Discord — not the banner',
     'Profile frames wrap around the profile instead of covering it',
@@ -951,7 +959,7 @@ const CHANGELOG=[
 ];
 let pType=0, pName='', pDetails='', pState='';
 let pLargeImg='', pLargeText='', pSmallImg='', pSmallText='';
-let STU={avatar:'',banner:'',deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,
+let STU={avatar:'',banner:'',deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,
   avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,
   bnBright:100,bnContrast:100,bnSat:100,bnHue:0,
   nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',open:'avatar',drag:false};
@@ -1252,6 +1260,18 @@ function giftCurrentTier(){
   for(let i=GIFT_TIERS.length-1;i>=0;i--) if(d.includes(GIFT_TIERS[i][0].toLowerCase())) return i+1;
   return 1; // has the badge but tier name not found
 }
+// The evolving Account Age / Game Variety / Game Time / Streaming badges (rolling
+// out from Discord). Detect the earned badge by id keyword or a tier-name match,
+// then read its current tier so the ladder lights up with the real icon.
+function familyTier(tiers,idHints){
+  const bs=earnedBadges();
+  let b=bs.find(x=>idHints.some(h=>(x.id||'').toLowerCase().includes(h)));
+  if(!b) b=bs.find(x=>tiers.some(t=>(x.description||'').toLowerCase().includes(t[0].toLowerCase())));
+  if(!b) return {tier:0,badge:null};
+  const d=((b.description||'')+' '+(b.id||'')).toLowerCase();
+  for(let i=tiers.length-1;i>=0;i--) if(d.includes(tiers[i][0].toLowerCase())) return {tier:i+1,badge:b};
+  return {tier:1,badge:b};
+}
 function tierFamily(title,emoji,intro,tiers,achievedCount,realIcon){
   const tiles=tiers.map((t,i)=>{
     const on=i<achievedCount, cur=i===achievedCount-1;
@@ -1278,11 +1298,17 @@ function badgesHtml(){
      +(owned.length?owned.map(b=>realTile(b)).join(''):'<div class="hempty">No profile badges yet.</div>')+'</div></div>';
 
   const giftBadge=earnedBadges().find(b=>b.id==='gifting');
+  const age=familyTier(AGE_TIERS,['account_age','account age']);
+  const variety=familyTier(VARIETY_TIERS,['game_variety','variety']);
+  const gtime=familyTier(TIME_TIERS,['game_time','play_time','playtime']);
+  const stream=familyTier(STREAM_TIERS,['stream']);
+  const ageT=age.tier||ageDone; // fall back to computed age if the badge isn't rolled out yet
+  const rolling='Discord is rolling this badge out — it lights up here automatically once it reaches your profile.';
   out+=tierFamily('Gift Giver','🎁', giftDone? 'You\'ve reached tier '+giftDone+' of 6 — send more gifts to evolve it.' : 'Send Nitro gifts to earn this evolving badge.', GIFT_TIERS, giftDone, giftBadge?badgeSrc(giftBadge):null);
-  out+=tierFamily('Account Age','🌳','Keep an active account — currently '+Math.floor(ay)+' years, tier '+ageDone+' of 10.',AGE_TIERS,ageDone);
-  out+=tierFamily('Game Variety','🎮','Play more detectable games with Discord open. Discord hasn\'t exposed live progress for this yet.',VARIETY_TIERS,0);
-  out+=tierFamily('Game Time','⏱️','Play more hours of detectable PC games. Discord hasn\'t exposed live progress for this yet.',TIME_TIERS,0);
-  out+=tierFamily('Streaming','📹','Stream more hours to other users. Discord hasn\'t exposed live progress for this yet.',STREAM_TIERS,0);
+  out+=tierFamily('Account Age','🌳', age.tier? ('Tier '+age.tier+' of 10.') : ('Your account is ~'+Math.floor(ay)+' years old (tier '+ageDone+'). '+rolling), AGE_TIERS, ageT, age.badge?badgeSrc(age.badge):null);
+  out+=tierFamily('Game Variety','🎮', variety.tier? ('Tier '+variety.tier+' of 10.') : ('Play more detectable games with Discord open. '+rolling), VARIETY_TIERS, variety.tier, variety.badge?badgeSrc(variety.badge):null);
+  out+=tierFamily('Game Time','⏱️', gtime.tier? ('Tier '+gtime.tier+' of 10.') : ('Play more hours of detectable PC games. '+rolling), TIME_TIERS, gtime.tier, gtime.badge?badgeSrc(gtime.badge):null);
+  out+=tierFamily('Streaming','📹', stream.tier? ('Tier '+stream.tier+' of 10.') : ('Stream more hours to other users. '+rolling), STREAM_TIERS, stream.tier, stream.badge?badgeSrc(stream.badge):null);
 
   out+='<div class="bsec"><div class="bsec-h">Locked <span>'+locked.length+'</span></div><div class="bgrid">'
      +locked.map(d=>realTile({id:d.id,icon:d.icon,description:CLASSIC_DESC[d.id]},'',true)).join('')+'</div></div>';
@@ -1320,7 +1346,7 @@ function applyNameStyle(){ const el=byId('stName'); if(!el) return; el.style.fon
 function decorateNameTiles(){ const cc=NCOLORS[STU.nameColor||0]||NCOLORS[0]; NEFFECTS.forEach(e=>{ const el=byId('efs_'+e[0]); if(el) applyEffectStyle(el,e[0],cc); }); }
 // Persist the studio look (debounced) so it's remembered across launches.
 let studioSaveT=0;
-function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,
+function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
   nameFont:STU.nameFont,nameEffect:STU.nameEffect,nameColor:STU.nameColor,themeA:STU.themeA,themeB:STU.themeB,open:STU.open,
   avBright:STU.avBright,avContrast:STU.avContrast,avSat:STU.avSat,avHue:STU.avHue,zoom:STU.zoom,
   bnBright:STU.bnBright,bnContrast:STU.bnContrast,bnSat:STU.bnSat,bnHue:STU.bnHue}; }
@@ -1336,6 +1362,12 @@ function fxRender(el,anim,img){
 // A frame wraps AROUND the profile: "back" layers sit behind the avatar/text,
 // "front" layers (the top crown) sit in front. Layers keep their natural aspect
 // so the transparent centre lets the profile show through.
+// Inset the card into the frame's window: the frame extends past the profile by
+// overflow_top/bottom/horizontal (as a fraction of its full width), so we margin
+// the card in by exactly those amounts and let the frame fill the wrapper around.
+function frameMargin(fm){ if(!fm) return ''; const w=(fm.iw||0)+2*(fm.oh||0); if(w<=0) return ''; return 'margin:'+(fm.ot/w*100).toFixed(3)+'% '+(fm.oh/w*100).toFixed(3)+'% '+(fm.ob/w*100).toFixed(3)+'%'; }
+// Static frame layer HTML (for the read-only equipped card).
+function frameHtml(cls,layers){ if(!layers||!layers.length) return ''; return '<div class="pp-frame '+cls+'">'+layers.map(l=>'<img class="fl fl-'+esc(l.anchor)+'" src="'+esc(l.url)+'">').join('')+'</div>'; }
 function frameRender(layers){
   const back=byId('stFrameBack'), front=byId('stFrameFront');
   const put=(el,ls)=>{ if(!el) return; if(ls&&ls.length){ el.style.display='block';
@@ -1366,11 +1398,11 @@ function stuUpload(kind){
 function catItem(sku){ return (CATALOG||SHOP||[]).find(i=>i.sku===sku); }
 // Toggle a collectible selection (deco/nameplate/effect/frame) by SKU.
 function stuPick(kind,sku){
-  if(!sku){ STU[kind]=''; if(kind==='frame')STU.frameLayers=null; if(kind==='effect')STU.effectAnim=null; stuApply(); saveStudio(); render(); return; }
+  if(!sku){ STU[kind]=''; if(kind==='frame'){STU.frameLayers=null;STU.frameMetrics=null;} if(kind==='effect')STU.effectAnim=null; stuApply(); saveStudio(); render(); return; }
   const it=catItem(sku); if(!it) return;
   const same=STU[kind]===it.image;
   STU[kind]=same?'':it.image;
-  if(kind==='frame') STU.frameLayers=same?null:(it.layers||null);
+  if(kind==='frame'){ STU.frameLayers=same?null:(it.layers||null); STU.frameMetrics=same?null:(it.metrics||null); }
   if(kind==='effect') STU.effectAnim=same?null:(it.anim||null);
   stuApply(); saveStudio(); render();
 }
@@ -1382,7 +1414,7 @@ function stuTheme(which,hex){ const k='theme'+which; STU[k]=(STU[k]===hex?'':hex
 function stuThemeVal(which,hex,el){ STU['theme'+which]=hex; stuApply(); saveStudio(); if(el){ const l=el.parentElement.querySelector('.colhex'); if(l) l.textContent=hex; } }
 function stuOpen(s){ STU.open=(STU.open===s?'':s); saveStudio(); render(); }
 function stuReset(){
-  Object.assign(STU,{deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
+  Object.assign(STU,{deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
     avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,bnBright:100,bnContrast:100,bnSat:100,bnHue:0});
   saveStudio(); render(); toast('Reset to default');
 }
@@ -1450,7 +1482,10 @@ function equippedProfile(){
   const orbs=(ORBS!=null)?ORBS.toLocaleString():'—';
   const conns=(e.connections||[]).slice(0,4).map(c=>'<div class="pp-conn"><span class="pp-conn-d"></span><span class="pp-conn-n">'+esc(c.name||'')+'</span><span class="pp-conn-t">'+esc(c.type||'')+'</span></div>').join('');
   const fx=(e.effectAnim&&e.effectAnim.length)?('<div class="pp-effect" style="display:block">'+e.effectAnim.map(s=>'<img class="fx-layer" src="'+esc(s)+'">').join('')+'</div>'):'';
-  return '<div class="ppreview pp-static" style="--pt:'+esc(pt)+';--pt2:'+esc(pt2)+'">'
+  const fl=e.frameLayers||[];
+  const fBack=frameHtml('back',fl.filter(l=>l.order!=='front')), fFront=frameHtml('front',fl.filter(l=>l.order==='front'));
+  return '<div class="pp-wrap">'+fBack
+    +'<div class="ppreview pp-static" style="--pt:'+esc(pt)+';--pt2:'+esc(pt2)+';'+frameMargin(e.frameMetrics)+'">'
     +fx
     +'<div class="pp-banner" style="'+bstyle+'"></div>'
     +'<div class="pp-avwrap"><div class="pp-av">'+(av?'<img src="'+esc(av)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>')+'</div>'
@@ -1468,7 +1503,7 @@ function equippedProfile(){
         +(conns?('<div class="pp-sub">Connections</div>'+conns):'')
         +'<div class="pp-sub">Aurora Orbs</div><div class="pp-val"><span class="orb-dot"></span> '+orbs+' orbs</div>'
       +'</div>'
-    +'</div></div>';
+    +'</div></div>'+fFront+'</div>';
 }
 // The Discord-style live profile card. `mode==='studio'` makes it the sticky,
 // editable preview; otherwise it's the read-only card shown on the homepage.
@@ -1480,12 +1515,12 @@ function profileCard(mode){
   const since=(BADGES&&BADGES.createdMs)?new Date(BADGES.createdMs).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}):'—';
   const sticky=(mode==='studio');
   const tA=STU.themeA||'#232428', tB=STU.themeB||STU.themeA||'#232428';
-  return '<div class="ppreview'+(sticky?' pp-sticky':' pp-static')+'" id="ppreview" style="--pt:'+tA+';--pt2:'+tB+'" onclick="ppClick()">'
-    +'<div class="pp-effect" id="stEffect"></div>'
+  return '<div class="pp-wrap" id="ppWrap">'
     +'<div class="pp-frame back" id="stFrameBack"></div>'
+    +'<div class="ppreview'+(sticky?' pp-sticky':' pp-static')+'" id="ppreview" style="--pt:'+tA+';--pt2:'+tB+';'+frameMargin(STU.frameMetrics)+'" onclick="ppClick()">'
+    +'<div class="pp-effect" id="stEffect"></div>'
     +'<div class="pp-banner" id="stBanner"></div>'
     +'<div class="pp-avwrap"><div class="pp-av" id="stAvatar">'+(STU.avatar?'':(USER&&USER.avatar?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>'))+'</div><div class="pp-deco" id="stDeco"></div><span class="pp-status"></span></div>'
-    +'<div class="pp-frame front" id="stFrameFront"></div>'
     +'<div class="pp-body">'
       +'<div class="pp-nameplate" id="stNameplate"></div>'
       +'<div class="pp-name" id="stName">'+name+'</div>'
@@ -1498,7 +1533,7 @@ function profileCard(mode){
         +'<div class="pp-sub">Aurora Orbs</div><div class="pp-val"><span class="orb-dot"></span> '+orbs+' orbs</div>'
       +'</div>'
       +(sticky?'<div class="pp-hint" id="ppHint">Live preview — edit on the left</div>':'')
-    +'</div></div>';
+    +'</div></div><div class="pp-frame front" id="stFrameFront"></div></div>';
 }
 // When the sticky preview is tucked into the corner, a click returns to the top.
 function ppClick(){ const pv=byId('ppreview'); if(pv&&pv.classList.contains('tucked')) byId('content').scrollTo({top:0,behavior:'smooth'}); }
