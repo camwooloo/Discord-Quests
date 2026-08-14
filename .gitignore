@@ -1,0 +1,6 @@
+/target
+*.old
+*.pdb
+preview*.html
+aurora_*.json
+icon.ico
