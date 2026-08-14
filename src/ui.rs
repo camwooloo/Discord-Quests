@@ -597,8 +597,17 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .colpick{width:34px;height:34px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:.14s var(--ease);box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .colpick:hover{transform:scale(1.1)}
 .colpick.on{border-color:#fff;box-shadow:0 0 0 2px rgba(var(--accent-rgb),.7)}
+/* full colour picker row (theme) */
+.colrow{display:flex;align-items:center;gap:10px;margin-bottom:2px}
+.colpk{width:46px;height:34px;border:1px solid var(--stroke);border-radius:9px;background:none;cursor:pointer;padding:2px}
+.colpk::-webkit-color-swatch{border:none;border-radius:6px}.colpk::-webkit-color-swatch-wrapper{padding:0}
+.colhex{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text);text-transform:uppercase}
+.colclr{margin-left:auto;width:28px;height:28px;border-radius:8px;color:var(--text-mute);display:grid;place-items:center}
+.colclr:hover{background:var(--glass-2);color:var(--text)}
 /* live profile preview */
-.ppreview{position:relative;border-radius:16px;overflow:hidden;background:#232428;border:1px solid var(--stroke);min-height:520px;--pt:var(--accent)}
+/* the theme's two colours tint the profile body (under the banner), not the banner */
+.ppreview{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--stroke);min-height:520px;--pt:#232428;--pt2:#232428;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--pt) 55%,#0e0f16),color-mix(in srgb,var(--pt2) 55%,#0e0f16))}
 .ppreview.pp-sticky{transition:box-shadow .2s var(--ease)}
 .ppreview.pp-static .pp-av{cursor:default}
 /* the big editable preview at the top of the profile studio */
@@ -621,9 +630,11 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
   padding:3px 7px;border-radius:7px;backdrop-filter:blur(4px)}
 .pp-effect{position:absolute;inset:0;z-index:4;background:center/cover no-repeat;pointer-events:none;mix-blend-mode:screen;opacity:.9;display:none}
 .pp-effect .fx-layer{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.pp-banner{height:150px;background:linear-gradient(145deg,var(--pt),var(--pt2,color-mix(in srgb,var(--pt) 45%,#000))) center/cover no-repeat}
-.pp-frame{position:absolute;inset:0;z-index:6;pointer-events:none;display:none}
-.pp-frame .fl{position:absolute;left:0;width:100%;object-fit:cover}
+.pp-banner{height:150px;background:linear-gradient(145deg,#41445a,#2a2c38) center/cover no-repeat;z-index:0}
+.pp-frame{position:absolute;inset:0;pointer-events:none;display:none}
+.pp-frame.back{z-index:1}
+.pp-frame.front{z-index:8}
+.pp-frame .fl{position:absolute;left:0;width:100%;height:auto}
 .pp-frame .fl-top{top:0}
 .pp-frame .fl-bottom{bottom:0}
 .pp-avwrap{position:relative;width:92px;height:92px;margin:-46px 0 0 22px;z-index:5}
@@ -688,6 +699,61 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .updbar .upd-x{width:32px;height:32px;border-radius:9px;color:var(--text-mute);display:grid;place-items:center}
 .updbar .upd-x:hover{background:var(--glass-2);color:var(--text)}
 .updbar.busy .upd-x{display:none}
+/* changelog / what's-new popup */
+.clog-wrap{position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:rgba(4,6,12,.72);backdrop-filter:blur(6px);animation:updIn .25s ease}
+.clog{width:min(440px,90vw);background:var(--bg-1);border:1px solid var(--stroke);border-radius:20px;padding:24px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.clog-h{display:flex;gap:14px;align-items:center;margin-bottom:16px}
+.clog-badge{width:52px;height:52px;flex:none;border-radius:15px;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,var(--accent),var(--accent-2))}
+.clog-t{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.clog-d{font-size:13px;color:var(--text-mute);margin-top:2px}
+.clog-list{margin:0 0 18px;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:14px;color:var(--text-dim)}
+.clog-list li{line-height:1.4}
+/* settings two-column: settings left, about/patch-notes right */
+.settings2{display:grid;grid-template-columns:1fr 340px;gap:22px;align-items:start}
+@media(max-width:920px){.settings2{grid-template-columns:1fr}}
+.set-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:14px}
+.who{padding:16px;border-radius:var(--radius);background:linear-gradient(135deg,rgba(var(--accent-rgb),.16),rgba(52,211,153,.08)),var(--glass);border:1px solid var(--stroke)}
+.who-t{font-size:12px;font-weight:700;color:var(--text-mute);letter-spacing:.4px}
+.who-row{display:flex;align-items:center;gap:12px;margin-top:8px}
+.who-av{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;background:linear-gradient(140deg,var(--accent),var(--accent-2));font-family:"Bricolage Grotesque",system-ui}
+.who-n{font-size:16px;font-weight:800}
+.who-l{font-size:13px;color:var(--accent);font-weight:650;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.who-l:hover{text-decoration:underline}
+.who-l svg{width:12px;height:12px}
+.patch{padding:16px;border-radius:var(--radius);background:var(--glass);border:1px solid var(--stroke)}
+.patch-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.patch-h h3{font-size:15px;font-weight:750}
+.patch-ver{margin-top:2px}
+.patch-v{font-size:14px;font-weight:800;color:var(--accent)}
+.patch-d{font-size:12px;color:var(--text-mute)}
+.patch-list{margin:8px 0 0;padding-left:16px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-dim)}
+.patch-list li{line-height:1.35}
+.patch-old{margin-top:12px;border-top:1px solid var(--stroke);padding-top:10px}
+.patch-old .patch-v{font-size:12.5px;color:var(--text-dim)}
+.chk-upd{height:34px;padding:0 12px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--text);background:var(--glass-2);border:1px solid var(--stroke)}
+.chk-upd:hover{background:var(--glass);border-color:rgba(var(--accent-rgb),.5)}
+/* quest history */
+.history{display:flex;flex-direction:column;gap:22px;padding-bottom:8px}
+.heatwrap{display:flex;flex-direction:column;gap:8px}
+.heatgrid{display:grid;grid-template-rows:repeat(7,14px);grid-auto-flow:column;grid-auto-columns:14px;gap:4px}
+.heat{width:14px;height:14px;border-radius:4px;background:var(--glass-2)}
+.heat.pad{background:transparent}
+.heat.l0{background:rgba(255,255,255,.05)}
+.heat.l1{background:rgba(var(--accent-rgb),.35)}
+.heat.l2{background:rgba(var(--accent-rgb),.65)}
+.heat.l3{background:var(--accent)}
+.heatkey{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text-mute);font-weight:600}
+.heatkey .heat{width:11px;height:11px}
+.hist-list{display:flex;flex-direction:column;gap:16px}
+.hist-day{display:flex;flex-direction:column;gap:7px}
+.hist-date{font-size:13px;font-weight:750;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.hist-date span{font-size:11.5px;font-weight:600;color:var(--text-mute);background:var(--glass);padding:2px 8px;border-radius:7px}
+.hist-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke)}
+.hist-cat{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,var(--accent),#8b6ee0)}
+.hist-cat.game{background:linear-gradient(140deg,#3ba55d,var(--accent-2))}
+.hist-cat svg{width:15px;height:15px}
+.hist-n{flex:1;min-width:0;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-o{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:750;color:#efe6ff}
 </style>
 </head>
 <body>
@@ -740,6 +806,10 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
     <button class="navbtn" data-nav="badges" onclick="setNav('badges')">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 1.9 3.2-.2 1 3 2.6 1.8-1.2 3 1.2 3-2.6 1.8-1 3-3.2-.2L12 21l-2.6-1.9-3.2.2-1-3L2.6 14.5l1.2-3-1.2-3 2.6-1.8 1-3 3.2.2z"/><path d="M9.2 12l2 2 3.6-4"/></svg>
       <span class="tip">Badges</span>
+    </button>
+    <button class="navbtn" data-nav="history" onclick="setNav('history')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h18v16H3z"/><path d="M3 9h18M8 3v3M16 3v3"/><path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg>
+      <span class="tip">History</span>
     </button>
     <div class="sp"></div>
     <div class="orbbal" id="orbBal" title="Your orb balance"><span class="orb-dot"></span><span id="orbBalNum">—</span></div>
@@ -860,7 +930,25 @@ let CUR=null, lastSent=-1, autoQueue=[], claiming={};
 let CURPLAY=null, playQueue=[];
 let USER=null, userShown=false, dataReady=false, finished=false, welcomeAt=0;
 let SHOP=null, shopLoading=false, shopFilter='all', shopSort='recent', shopErr=null, OWNED=null;
-let ORBS=null, BADGES=null, STATS=null, EQUIPPED=null, navInit=false;
+let ORBS=null, BADGES=null, STATS=null, EQUIPPED=null, HISTORY=null, navInit=false;
+let APP_VERSION='', changelogShown=false;
+// In-app patch notes (keep the top entry's version in sync with Cargo.toml).
+const CHANGELOG=[
+  {v:'0.3.1',d:'14 Aug 2026',notes:[
+    'Profile theme is now a full colour picker and tints your profile (under the banner), like Discord — not the banner',
+    'Profile frames wrap around the profile instead of covering it',
+    'New Quest History tab with an activity calendar and completed-quest log',
+    'Settings now shows who made it, patch notes, and a Check for updates button',
+    'A "what\\u2019s new" popup after each update',
+  ]},
+  {v:'0.3.0',d:'14 Aug 2026',notes:[
+    'First public release',
+    'Profile studio: preview every decoration, nameplate, effect, frame, name style & theme',
+    'Animated profile effects and real equipped-profile card on Home',
+    'System tray, desktop notifications, light theme + accent picker',
+    'Built-in auto-update from GitHub Releases',
+  ]},
+];
 let pType=0, pName='', pDetails='', pState='';
 let pLargeImg='', pLargeText='', pSmallImg='', pSmallText='';
 let STU={avatar:'',banner:'',deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,
@@ -971,7 +1059,7 @@ window.setError=function(msg){ GOT=true;
 };
 window.setSettings=function(s){ SET=Object.assign(SET,s||{}); applyTheme();
   if(!navInit){ navInit=true; if(SET.default_page && TITLES[SET.default_page] && SET.default_page!=='home') setNav(SET.default_page); }
-  if(NAV==='settings') render(); syncAuto(); maybeSplash(); };
+  if(NAV==='settings') render(); syncAuto(); maybeSplash(); maybeChangelog(); };
 function setDefaultPage(p){ SET.default_page=p; send('setSettingStr',{key:'default_page',value:p}); render(); }
 const ACCENTS={aurora:['#b794f6','#34d399','183,148,246'],emerald:['#3ddc84','#22d3ee','61,220,132'],sky:['#9ec5ff','#6ea8fe','158,197,255'],gold:['#f3c969','#e0a13a','243,201,105'],cyber:['#fcee0a','#00f0ff','252,238,10']};
 function applyTheme(){
@@ -990,6 +1078,29 @@ window.setOwned=function(list){ OWNED=list||[]; if((NAV==='shop'&&shopFilter==='
 window.setCatalog=function(list){ catLoading=false; CATALOG=list||[]; if(NAV==='profile') render(); };
 window.setStudio=function(s){ if(s&&typeof s==='object'){ Object.assign(STU,s); } if(NAV==='profile'){ render(); stuApply(); } };
 window.setEquipped=function(e){ EQUIPPED=e||null; if(NAV==='home'||NAV==='profile') render(); };
+window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
+window.setVersion=function(v){ APP_VERSION=v||''; maybeChangelog(); };
+window.noUpdate=function(){ toast('You\'re on the latest version'); };
+// Show the changelog once after an update (last-seen version differs from now).
+function maybeChangelog(){
+  if(changelogShown||!APP_VERSION||SET.last_seen_version===undefined) return;
+  const seen=SET.last_seen_version||'';
+  if(seen && seen!==APP_VERSION && CHANGELOG[0] && CHANGELOG[0].v===APP_VERSION){
+    changelogShown=true; showChangelog(true);
+  }
+  if(seen!==APP_VERSION){ SET.last_seen_version=APP_VERSION; send('setSettingStr',{key:'last_seen_version',value:APP_VERSION}); }
+}
+function showChangelog(isUpdate){
+  const e=CHANGELOG[0]; if(!e) return;
+  const items=e.notes.map(n=>'<li>'+esc(n)+'</li>').join('');
+  const w=document.createElement('div'); w.className='clog-wrap'; w.id='clogWrap';
+  w.innerHTML='<div class="clog"><div class="clog-h"><div class="clog-badge">'+ICO.party+'</div>'
+    +'<div><div class="clog-t">'+(isUpdate?'Updated to':'What\\u2019s new in')+' v'+esc(e.v)+'</div><div class="clog-d">'+esc(e.d)+'</div></div></div>'
+    +'<ul class="clog-list">'+items+'</ul>'
+    +'<button class="act primary" style="width:100%" onclick="byId(\'clogWrap\').remove()">Got it</button></div>';
+  document.body.appendChild(w);
+}
+function checkUpdateNow(){ toast('Checking for updates…'); send('checkUpdate'); }
 window.updateAvailable=function(info){
   if(!info||byId('updbar')) return;
   const b=document.createElement('div'); b.className='updbar'; b.id='updbar';
@@ -1043,12 +1154,12 @@ let countedStats=new Set();
 function onCompleted(q){
   if(!q||countedStats.has(q.id)) return;
   countedStats.add(q.id);
-  send('stat',{orbs:(q.premiumOrbs||q.orbs||0),seconds:(q.target||0)});
+  send('stat',{orbs:(q.premiumOrbs||q.orbs||0),seconds:(q.target||0),name:(q.name||'Quest'),category:(q.category||'')});
   send('notify',{title:'Quest complete',body:(q.name||'A quest')+' is ready to claim'});
 }
 
 /* ====================== nav / filters ====================== */
-const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',profile:'Your Profile',settings:'Settings'};
+const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',profile:'Your Profile',settings:'Settings'};
 function setNav(n){
   NAV=n; byId('pageTitle').textContent=TITLES[n];
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===n));
@@ -1222,6 +1333,18 @@ function fxRender(el,anim,img){
   else if(img){ el.style.display='block'; el.innerHTML=''; el.style.backgroundImage='url("'+img+'")'; }
   else { el.style.display='none'; el.innerHTML=''; el.style.backgroundImage=''; }
 }
+// A frame wraps AROUND the profile: "back" layers sit behind the avatar/text,
+// "front" layers (the top crown) sit in front. Layers keep their natural aspect
+// so the transparent centre lets the profile show through.
+function frameRender(layers){
+  const back=byId('stFrameBack'), front=byId('stFrameFront');
+  const put=(el,ls)=>{ if(!el) return; if(ls&&ls.length){ el.style.display='block';
+      el.innerHTML=ls.map(l=>'<img class="fl fl-'+esc(l.anchor)+'" src="'+esc(l.url)+'">').join(''); }
+    else { el.style.display='none'; el.innerHTML=''; } };
+  const ls=layers||[];
+  put(back, ls.filter(l=>l.order!=='front'));
+  put(front, ls.filter(l=>l.order==='front'));
+}
 function stuApply(){
   const av=byId('stAvatar'), bn=byId('stBanner');
   if(av){ av.style.filter=stuFilterAv(); av.style.backgroundImage=STU.avatar?'url("'+STU.avatar+'")':''; av.style.backgroundSize=STU.zoom+'%'; av.style.backgroundPosition=STU.posX+'% '+STU.posY+'%'; }
@@ -1229,16 +1352,10 @@ function stuApply(){
   const set=(id,url)=>{ const e=byId(id); if(e){ e.style.backgroundImage=url?'url("'+url+'")':''; e.style.display=url?'block':'none'; } };
   set('stDeco',STU.deco); set('stNameplate',STU.nameplate);
   fxRender(byId('stEffect'),STU.effectAnim,STU.effect);
-  const fr=byId('stFrame');
-  if(fr){ if(STU.frameLayers&&STU.frameLayers.length){ fr.style.display='block';
-      fr.innerHTML=STU.frameLayers.map(l=>'<img class="fl fl-'+esc(l.anchor)+' fl-'+esc(l.order)+'" src="'+esc(l.url)+'">').join(''); }
-    else { fr.style.display='none'; fr.innerHTML=''; } }
+  frameRender(STU.frameLayers);
   applyNameStyle();
   const pv=byId('ppreview');
-  if(pv){ const rs=getComputedStyle(document.documentElement);
-    const a=STU.themeA||(rs.getPropertyValue('--accent').trim()||'#b794f6');
-    const b=STU.themeB||STU.themeA||(rs.getPropertyValue('--accent-2').trim()||'#34d399');
-    pv.style.setProperty('--pt',a); pv.style.setProperty('--pt2',b); }
+  if(pv){ pv.style.setProperty('--pt',STU.themeA||'#232428'); pv.style.setProperty('--pt2',STU.themeB||STU.themeA||'#232428'); }
 }
 function stuSet(k,v,el){ STU[k]=+v; if(el){ const b=el.parentElement.querySelector('b'); if(b) b.textContent=v+(el.dataset.u||''); } stuApply(); saveStudio(); }
 function stuUpload(kind){
@@ -1261,6 +1378,8 @@ function stuFont(id){ STU.nameFont=id; applyNameStyle(); saveStudio(); render();
 function stuEffect(id){ STU.nameEffect=id; applyNameStyle(); saveStudio(); render(); }
 function stuColor(i){ STU.nameColor=i; applyNameStyle(); saveStudio(); render(); }
 function stuTheme(which,hex){ const k='theme'+which; STU[k]=(STU[k]===hex?'':hex); stuApply(); saveStudio(); render(); }
+// Live colour-picker updates (no full re-render, so the OS picker stays open).
+function stuThemeVal(which,hex,el){ STU['theme'+which]=hex; stuApply(); saveStudio(); if(el){ const l=el.parentElement.querySelector('.colhex'); if(l) l.textContent=hex; } }
 function stuOpen(s){ STU.open=(STU.open===s?'':s); saveStudio(); render(); }
 function stuReset(){
   Object.assign(STU,{deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
@@ -1325,8 +1444,8 @@ function equippedProfile(){
   const cols=(e.nameColors&&e.nameColors.length)?e.nameColors:null;
   const c2=cols?(cols.find(c=>c&&c!==cols[0])||cols[0]):null;
   const nameSty=cols?('background:linear-gradient(95deg,'+cols[0]+','+c2+');-webkit-background-clip:text;background-clip:text;color:transparent'):'';
-  const pt=e.themeA||'var(--accent)', pt2=e.themeB||e.themeA||'var(--accent-2)';
-  const bstyle=e.banner?('background-image:url(\''+esc(e.banner)+'\')'):('background:linear-gradient(145deg,'+pt+','+pt2+')');
+  const pt=e.themeA||'#232428', pt2=e.themeB||e.themeA||'#232428';
+  const bstyle=e.banner?('background-image:url(\''+esc(e.banner)+'\')'):'';
   const since=(BADGES&&BADGES.createdMs)?new Date(BADGES.createdMs).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}):'—';
   const orbs=(ORBS!=null)?ORBS.toLocaleString():'—';
   const conns=(e.connections||[]).slice(0,4).map(c=>'<div class="pp-conn"><span class="pp-conn-d"></span><span class="pp-conn-n">'+esc(c.name||'')+'</span><span class="pp-conn-t">'+esc(c.type||'')+'</span></div>').join('');
@@ -1360,12 +1479,13 @@ function profileCard(mode){
   const orbs=(ORBS!=null)?ORBS.toLocaleString():'—';
   const since=(BADGES&&BADGES.createdMs)?new Date(BADGES.createdMs).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'}):'—';
   const sticky=(mode==='studio');
-  const tA=STU.themeA||'var(--accent)', tB=STU.themeB||STU.themeA||'var(--accent-2)';
+  const tA=STU.themeA||'#232428', tB=STU.themeB||STU.themeA||'#232428';
   return '<div class="ppreview'+(sticky?' pp-sticky':' pp-static')+'" id="ppreview" style="--pt:'+tA+';--pt2:'+tB+'" onclick="ppClick()">'
     +'<div class="pp-effect" id="stEffect"></div>'
+    +'<div class="pp-frame back" id="stFrameBack"></div>'
     +'<div class="pp-banner" id="stBanner"></div>'
-    +'<div class="pp-frame" id="stFrame"></div>'
     +'<div class="pp-avwrap"><div class="pp-av" id="stAvatar">'+(STU.avatar?'':(USER&&USER.avatar?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>'))+'</div><div class="pp-deco" id="stDeco"></div><span class="pp-status"></span></div>'
+    +'<div class="pp-frame front" id="stFrameFront"></div>'
     +'<div class="pp-body">'
       +'<div class="pp-nameplate" id="stNameplate"></div>'
       +'<div class="pp-name" id="stName">'+name+'</div>'
@@ -1403,6 +1523,7 @@ function studioHtml(){
     +NCOLORS.map((c,i)=>'<button class="colpick'+(STU.nameColor===i?' on':'')+'" onclick="stuColor('+i+')" style="background:linear-gradient(135deg,'+c[0]+','+c[1]+')"></button>').join('')+'</div>';
   const themeDot=(STU.themeA||STU.themeB)?('<span class="mini" style="background:linear-gradient(135deg,'+(STU.themeA||'#555')+','+(STU.themeB||STU.themeA||'#555')+')"></span>'):'';
   const themeSw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\')"></button>').join('')+'</div>';
+  const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\')" title="Clear">'+ICO.close+'</button>':'')+'</div>'; };
   const cust=
      stuSection('nameplate','Nameplate',swImg(STU.nameplate), stuPicker('nameplate'))
     +stuSection('avatar','Avatar',swImg(STU.avatar,'<span class="mini ph"></span>'),
@@ -1414,9 +1535,9 @@ function studioHtml(){
     +stuSection('decoration','Decoration',swImg(STU.deco,'<span class="mini ph"></span>'), stuPicker('deco'))
     +stuSection('namestyle','Display Name Style',nameStyleSwatch(), fonts+effs+cols)
     +stuSection('theme','Theme',themeDot,
-        '<div class="ff-l">Primary colour</div>'+themeSw('A')
-        +'<div class="ff-l">Secondary colour</div>'+themeSw('B')
-        +'<div class="hempty">Discord blends two colours across your profile — set both for the gradient.</div>')
+        '<div class="ff-l">Primary colour</div>'+colInput('A')+themeSw('A')
+        +'<div class="ff-l">Secondary colour</div>'+colInput('B')+themeSw('B')
+        +'<div class="hempty">Like Discord, the two colours tint your profile (the area under the banner) — not the banner itself. Use the picker for any colour.</div>')
     +stuSection('banner','Banner',swImg(STU.banner),
         '<div class="st-row"><button class="act ghost" onclick="stuUpload(\'banner\')">⬆ Upload banner</button></div>'
         +stuSlider('bnBright','Brightness',20,180,'%')+stuSlider('bnContrast','Contrast',20,180,'%')
@@ -1499,6 +1620,42 @@ function profileHtml(){
     +'</div>';
 }
 
+/* ====================== quest history ====================== */
+function fmtDate(s){ try{ return new Date(s+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }catch(e){ return s; } }
+function calendarHeat(counts){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=98, cells=[];
+  for(let i=days-1;i>=0;i--){ const d=new Date(today); d.setDate(today.getDate()-i);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    cells.push({key,c:counts[key]||0,dow:d.getDay()}); }
+  let grid=''; for(let i=0;i<cells[0].dow;i++) grid+='<span class="heat pad"></span>';
+  cells.forEach(c=>{ const lvl=c.c===0?0:c.c<2?1:c.c<4?2:3;
+    grid+='<span class="heat l'+lvl+'" data-tip="'+c.key+' · '+c.c+' quest'+(c.c===1?'':'s')+'"></span>'; });
+  return '<div class="heatwrap"><div class="heatgrid">'+grid+'</div><div class="heatkey">Less '
+    +'<span class="heat l0"></span><span class="heat l1"></span><span class="heat l2"></span><span class="heat l3"></span> More</div></div>';
+}
+function historyHtml(){
+  if(HISTORY===null) return '<div class="mid"><div class="spin"></div><p>Loading history…</p></div>';
+  if(!HISTORY.length) return '<div class="mid"><div class="ic">'+ICO.empty+'</div><h2>No quest history yet</h2><p>Every quest you finish gets logged here with the date — your activity builds up over time.</p></div>';
+  const items=HISTORY.slice().reverse();
+  const totalOrbs=HISTORY.reduce((s,e)=>s+(e.orbs||0),0);
+  const byDate={}; items.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
+  const dates=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+  const counts={}; HISTORY.forEach(e=>counts[e.date]=(counts[e.date]||0)+1);
+  const groups=dates.map(d=>{
+    const rows=byDate[d].map(e=>'<div class="hist-row"><span class="hist-cat '+esc(e.category||'')+'">'+(e.category==='game'?ICO.play:ICO.check)+'</span>'
+      +'<span class="hist-n">'+esc(e.name)+'</span>'+(e.orbs?'<span class="hist-o"><span class="orb-dot"></span>'+e.orbs+'</span>':'')+'</div>').join('');
+    return '<div class="hist-day"><div class="hist-date">'+esc(fmtDate(d))+'<span>'+byDate[d].length+' quest'+(byDate[d].length===1?'':'s')+'</span></div>'+rows+'</div>';
+  }).join('');
+  const tile=(ic,v,l)=>'<div class="stat"><div class="stat-ic">'+ic+'</div><div class="stat-v">'+v+'</div><div class="stat-l">'+l+'</div></div>';
+  return '<div class="history">'
+    +'<div class="hstats">'+tile('✅',HISTORY.length,'Quests completed')+tile('🔮',totalOrbs.toLocaleString(),'Orbs earned')
+      +tile('📅',dates.length,'Active days')+tile('🔥',(STATS?(STATS.streak_days||0):0)+(STATS&&STATS.streak_days===1?' day':' days'),'Current streak')+'</div>'
+    +'<div class="hsec"><div class="hsec-head"><h3>Activity — last 14 weeks</h3></div>'+calendarHeat(counts)+'</div>'
+    +'<div class="hsec"><div class="hsec-head"><h3>Completed quests</h3></div><div class="hist-list">'+groups+'</div></div>'
+  +'</div>';
+}
+
 /* ====================== home ====================== */
 function homeHtml(){
   const av=(USER&&USER.avatar)?'<img src="'+esc(USER.avatar)+'" alt="">':'<span>'+((USER&&USER.name?USER.name.trim()[0]:'?').toUpperCase())+'</span>';
@@ -1556,6 +1713,7 @@ function render(){
   if(NAV==='settings'){ c.innerHTML=settingsHtml(); return; }
   if(NAV==='shop'){ c.innerHTML=shopHtml(); return; }
   if(NAV==='badges'){ c.innerHTML=badgesHtml(); return; }
+  if(NAV==='history'){ c.innerHTML=historyHtml(); return; }
   if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); setupStickyPreview(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
   if(NAV==='home'){ c.innerHTML=homeHtml(); if(SHOP===null&&!shopLoading){ shopLoading=true; send('loadShop'); } return; }
   if(!GOT) return;
@@ -1621,7 +1779,7 @@ function settingsHtml(){
   const pages=[['home','Home'],['video','Watch'],['game','Games'],['claim','Claim'],['shop','Shop'],['badges','Badges']];
   const dp=SET.default_page||'home';
   const pageBtns=pages.map(p=>'<button class="chip'+(dp===p[0]?' on':'')+'" onclick="setDefaultPage(\''+p[0]+'\')">'+p[1]+'</button>').join('');
-  return '<div class="settings">'
+  return '<div class="settings2"><div class="settings">'
    +'<div class="sgroup"><h3>General</h3>'
      +'<div class="srow"><div class="txt"><div class="t">Default page</div><div class="d">Which page opens when you launch the app.</div></div><div class="chips wrap" style="max-width:340px;justify-content:flex-end">'+pageBtns+'</div></div>'
    +'</div>'
@@ -1646,7 +1804,19 @@ function settingsHtml(){
    +'<div class="sgroup"><h3>About</h3>'
      +'<div class="srow"><div class="txt"><div class="t">Aurora Quests</div><div class="d">Reads the quests from your signed-in Discord client on this PC — nothing is sent anywhere else. Videos and games run in real time (a 30s quest takes 30s).</div></div></div>'
      +'<div class="srow"><div class="txt"><div class="t">⚠ Heads up</div><div class="d">This automates quest completion and presence using your Discord account token, which is against Discord\'s Terms of Service. It works on your own account, for your own rewards, but there is a small risk to your account — use at your own discretion.</div></div></div>'
-   +'</div></div>';
+   +'</div></div>'+settingsSide()+'</div>';
+}
+function settingsSide(){
+  const e=CHANGELOG[0];
+  const running=(APP_VERSION&&e&&APP_VERSION!==e.v)?(' · running v'+esc(APP_VERSION)):'';
+  const cur=e?('<div class="patch-ver"><div class="patch-v">v'+esc(e.v)+running+'</div><div class="patch-d">'+esc(e.d)+'</div></div><ul class="patch-list">'+e.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>'):'';
+  const older=CHANGELOG.slice(1,4).map(c=>'<div class="patch-old"><div class="patch-v">v'+esc(c.v)+' · '+esc(c.d)+'</div><ul class="patch-list">'+c.notes.slice(0,3).map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul></div>').join('');
+  return '<div class="set-side">'
+    +'<div class="who"><div class="who-t">MADE BY</div><div class="who-row"><div class="who-av">C</div>'
+      +'<div><div class="who-n">camwooloo</div><span class="who-l" onclick="send(\'openExternal\',{url:\'https://camwooloo.com\'})">camwooloo.com '+ICO.ext+'</span></div></div></div>'
+    +'<div class="patch"><div class="patch-h"><h3>Patch notes</h3><button class="chk-upd" onclick="checkUpdateNow()">Check for updates</button></div>'
+      +cur+older+'</div>'
+  +'</div>';
 }
 function setOpt(k){ SET[k]=!SET[k]; render(); send('setSetting',{key:k,value:SET[k]}); if(k==='auto_watch') syncAuto(); if(k==='auto_play') syncAutoPlay(); }
 function syncAutoPlay(){ if(!SET.auto_play) return; if(!CURPLAY && !playQueue.length){ playQueue=pendingGames().map(q=>q.id); nextPlay(); } }

@@ -37,6 +37,8 @@ pub struct Settings {
     pub notifications: bool,
     /// Minimize to the system tray instead of the taskbar.
     pub minimize_to_tray: bool,
+    /// Last app version whose changelog the user has seen (for the update popup).
+    pub last_seen_version: String,
 }
 
 impl Default for Settings {
@@ -54,6 +56,7 @@ impl Default for Settings {
             accent: "aurora".into(),
             notifications: false,
             minimize_to_tray: false,
+            last_seen_version: String::new(),
         }
     }
 }

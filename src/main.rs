@@ -5,6 +5,7 @@
 
 mod discord;
 mod gateway;
+mod history;
 mod quests;
 mod settings;
 mod stats;
@@ -489,6 +490,7 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                     "orb_goal" => s.orb_goal = val,
                     "theme" => s.theme = val,
                     "accent" => s.accent = val,
+                    "last_seen_version" => s.last_seen_version = val,
                     _ => return,
                 }
                 settings::save(&s);
@@ -497,6 +499,8 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
         "stat" => {
             let orbs = v["orbs"].as_u64().unwrap_or(0);
             let seconds = v["seconds"].as_u64().unwrap_or(0);
+            let name = v["name"].as_str().unwrap_or("Quest").to_string();
+            let category = v["category"].as_str().unwrap_or("").to_string();
             let proxy = proxy.clone();
             std::thread::spawn(move || {
                 let mut st = stats::load();
@@ -504,6 +508,29 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                 stats::save(&st);
                 if let Ok(js) = serde_json::to_string(&st) {
                     let _ = proxy.send_event(UserEvent::Eval(format!("window.setStats({js})")));
+                }
+                let hist = history::add(&name, &category, orbs);
+                if let Ok(js) = serde_json::to_string(&hist) {
+                    let _ = proxy.send_event(UserEvent::Eval(format!("window.setHistory({js})")));
+                }
+            });
+        }
+        "checkUpdate" => {
+            // Manual "Check for updates" from Settings.
+            let proxy = proxy.clone();
+            let update_url = ctx.update_url.clone();
+            std::thread::spawn(move || match update::check() {
+                Some((ver, url, notes)) => {
+                    *update_url.lock().unwrap() = Some(url);
+                    let payload = serde_json::json!({ "version": ver, "notes": notes });
+                    let _ = proxy.send_event(UserEvent::Eval(format!(
+                        "window.updateAvailable&&window.updateAvailable({payload})"
+                    )));
+                }
+                None => {
+                    let _ = proxy.send_event(UserEvent::Eval(
+                        "window.noUpdate&&window.noUpdate()".to_string(),
+                    ));
                 }
             });
         }
@@ -537,10 +564,19 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             });
         }
         "ready" | "rescan" => {
+            // Tell the UI which version is running (for the changelog popup).
+            let _ = proxy.send_event(UserEvent::Eval(format!(
+                "window.setVersion&&window.setVersion(\"{}\")",
+                env!("CARGO_PKG_VERSION")
+            )));
             // Push saved settings alongside the quest list.
             let s = settings::load();
             if let Ok(js) = serde_json::to_string(&s) {
                 let _ = proxy.send_event(UserEvent::Eval(format!("window.setSettings({js})")));
+            }
+            // Push the completed-quest history for the History view.
+            if let Ok(js) = serde_json::to_string(&history::load()) {
+                let _ = proxy.send_event(UserEvent::Eval(format!("window.setHistory({js})")));
             }
             // Restore the remembered profile-studio look.
             let st = studio::load();
@@ -783,9 +819,11 @@ fn run_html_preview() {
     let orbs = client.fetch_orbs().unwrap_or(0);
     let prof = client.fetch_profile().map(|p| p.to_string()).unwrap_or_else(|_| "null".into());
     let equipped = client.fetch_equipped().unwrap_or_else(|_| "null".into());
+    let hist = serde_json::to_string(&history::load()).unwrap_or_else(|_| "[]".into());
+    let ver = env!("CARGO_PKG_VERSION");
     let page = ui::page_html().replace(
         "/*BOOTSTRAP*/",
-        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});"),
+        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});window.setHistory({hist});window.setVersion(\"{ver}\");"),
     );
     let out = std::env::temp_dir().join("aurora_quests_preview.html");
     let _ = std::fs::write(&out, page);
