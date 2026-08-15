@@ -898,6 +898,10 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h18v16H3z"/><path d="M3 9h18M8 3v3M16 3v3"/><path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg>
       <span class="tip">History</span>
     </button>
+    <button class="navbtn" data-nav="misc" onclick="setNav('misc')">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+      <span class="tip">Misc</span>
+    </button>
     <div class="sp"></div>
     <div class="orbbal" id="orbBal" title="Your orb balance"><span class="orb-dot"></span><span id="orbBalNum">—</span></div>
     <button class="navbtn" data-nav="settings" onclick="setNav('settings')">
@@ -1022,6 +1026,11 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.7',d:'15 Aug 2026',notes:[
+    'Equipped profile frame now actually renders on Home and the preview (a display bug was hiding it) and wraps the card cleanly',
+    'The locked preview + nameplate now scale to always fit the window — no scrolling needed to see both',
+    'Moved All-time stats & Custom Rich Presence out of the profile into a new Misc tab',
+  ]},
   {v:'0.3.6',d:'15 Aug 2026',notes:[
     'Equipped profile frame now shows on Home and the preview, wrapping correctly (its side-border layer wasn\\u2019t being stretched to the card height)',
     'Changing an item now opens in-place on the left, so the live preview + nameplate stay locked on the right — no popup covering things',
@@ -1306,12 +1315,12 @@ function onCompleted(q){
 }
 
 /* ====================== nav / filters ====================== */
-const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',profile:'Your Profile',settings:'Settings'};
+const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',misc:'Misc',profile:'Your Profile',settings:'Settings'};
 function setNav(n){
   NAV=n; custView=null; byId('pageTitle').textContent=TITLES[n];
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===n));
   byId('railAvatar').classList.toggle('active',n==='profile');
-  byId('toolbar').style.display=(['settings','shop','home','badges','profile'].includes(n))?'none':'flex';
+  byId('toolbar').style.display=(['settings','shop','home','badges','profile','history','misc'].includes(n))?'none':'flex';
   byId('watchAllBtn').style.display=(n==='video')?'flex':'none';
   byId('playAllBtn').style.display=(n==='game')?'flex':'none';
   byId('presenceBtn').style.display=(n==='game')?'flex':'none';
@@ -1521,7 +1530,7 @@ function refreshFrameFromCatalog(){
   if(it){ if(it.layers) STU.frameLayers=it.layers; if(it.metrics) STU.frameMetrics=it.metrics; }
 }
 // Static frame layer HTML (for the read-only equipped card).
-function frameHtml(cls,layers){ if(!layers||!layers.length) return ''; return '<div class="pp-frame '+cls+'">'+layers.map(l=>'<img class="fl fl-'+esc(l.anchor)+'" src="'+esc(l.url)+'">').join('')+'</div>'; }
+function frameHtml(cls,layers){ if(!layers||!layers.length) return ''; return '<div class="pp-frame '+cls+'" style="display:block">'+layers.map(l=>'<img class="fl fl-'+esc(l.anchor)+'" src="'+esc(l.url)+'">').join('')+'</div>'; }
 function frameRender(layers){
   const back=byId('stFrameBack'), front=byId('stFrameFront');
   const put=(el,ls)=>{ if(!el) return; if(ls&&ls.length){ el.style.display='block';
@@ -1590,6 +1599,17 @@ function stuExport(kind){
   img.onerror=()=>toast('Upload an image first');
   img.src=STU[kind]||''; if(!STU[kind]) toast('Upload a '+kind+' first');
 }
+// Scale the locked right-hand preview column so preview + nameplate always fit
+// the window without scrolling.
+function fitPreview(){
+  const col=byId('profRight'), c=byId('content'); if(!col||!c) return;
+  col.style.transform='none';
+  requestAnimationFrame(function(){
+    const avail=c.clientHeight-24, h=col.scrollHeight;
+    if(h>avail){ col.style.transformOrigin='top center'; col.style.transform='scale('+Math.max(0.5,avail/h).toFixed(3)+')'; }
+  });
+}
+window.addEventListener('resize',function(){ if(NAV==='profile') fitPreview(); });
 function setupStuDrag(){
   const av=byId('stAvatar'); if(!av) return;
   let dragging=false,lx=0,ly=0;
@@ -1862,15 +1882,19 @@ function broadcastPresence(){
 }
 function clearPresenceUI(){ send('clearPresence'); toast('Presence cleared'); }
 function profileHtml(){
-  const left=studioHtml()
-    +'<div class="hsec" style="margin-top:26px"><div class="hsec-head"><h3>All-time stats</h3></div><div class="statgrid">'+statTiles()+'</div></div>'
-    +'<div class="hsec"><div class="hsec-head"><h3>Custom Rich Presence</h3></div>'
-      +'<div class="hempty" style="margin:-4px 0 12px">Click the activity type or any line to edit it — just like Discord. It shows on your profile to friends while the app is open (a quest game overrides it).</div>'
-      +'<div class="rpwrap">'+presenceEditorCard()+'</div></div>';
-  const right='<div class="prof-right"><div class="studio-preview">'+profileCard('studio')+'</div>'
+  const right='<div class="prof-right" id="profRight"><div class="studio-preview">'+profileCard('studio')+'</div>'
     +'<div class="np-side"><div class="np-side-h">Nameplate · member list</div>'
     +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div></div>';
-  return '<div class="profile"><div class="prof2col"><div class="prof-left">'+left+'</div>'+right+'</div></div>';
+  return '<div class="profile"><div class="prof2col"><div class="prof-left">'+studioHtml()+'</div>'+right+'</div></div>';
+}
+// The Misc tab: all-time stats + the custom Rich Presence editor.
+function miscHtml(){
+  return '<div class="misc">'
+    +'<div class="hsec"><div class="hsec-head"><h3>All-time stats</h3></div><div class="hstats">'+statTiles()+'</div></div>'
+    +'<div class="hsec"><div class="hsec-head"><h3>Custom Rich Presence</h3></div>'
+      +'<div class="hempty" style="margin:-4px 0 12px">Click the activity type or any line to edit it — just like Discord. It shows on your profile to friends while the app is open (a quest game overrides it).</div>'
+      +'<div class="rpwrap">'+presenceEditorCard()+'</div></div>'
+    +'</div>';
 }
 
 /* ====================== quest history ====================== */
@@ -1971,7 +1995,8 @@ function render(){
   if(NAV==='shop'){ c.innerHTML=shopHtml(); return; }
   if(NAV==='badges'){ c.innerHTML=badgesHtml(); return; }
   if(NAV==='history'){ c.innerHTML=historyHtml(); return; }
-  if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
+  if(NAV==='misc'){ c.innerHTML=miscHtml(); return; }
+  if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); fitPreview(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
   if(NAV==='home'){ c.innerHTML=homeHtml(); if(SHOP===null&&!shopLoading){ shopLoading=true; send('loadShop'); } return; }
   if(!GOT) return;
   const list=visible();
