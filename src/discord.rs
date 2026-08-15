@@ -9,15 +9,56 @@ use crate::quests::{self, Quest, CLIENT_UA};
 pub struct DiscordClient {
     token: String,
     token_err: Option<String>,
+    /// Session caches so we hit each endpoint once instead of several times
+    /// (keeps us well under Discord's rate limits).
+    catalog_cache: std::sync::Mutex<Option<String>>,
+    me_cache: std::sync::Mutex<Option<Value>>,
+    profile_cache: std::sync::Mutex<Option<Value>>,
 }
 
 impl DiscordClient {
     /// Build from the locally logged-in Discord client.
     pub fn from_local() -> Self {
-        match crate::token::find_token() {
-            Ok(token) => DiscordClient { token, token_err: None },
-            Err(e) => DiscordClient { token: String::new(), token_err: Some(e) },
+        let (token, token_err) = match crate::token::find_token() {
+            Ok(t) => (t, None),
+            Err(e) => (String::new(), Some(e)),
+        };
+        DiscordClient {
+            token,
+            token_err,
+            catalog_cache: std::sync::Mutex::new(None),
+            me_cache: std::sync::Mutex::new(None),
+            profile_cache: std::sync::Mutex::new(None),
         }
+    }
+
+    /// `/users/@me`, fetched once per session.
+    fn get_me(&self) -> Result<Value, String> {
+        if let Some(v) = self.me_cache.lock().unwrap().clone() {
+            return Ok(v);
+        }
+        let v: Value = ureq::get("https://discord.com/api/v9/users/@me")
+            .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
+            .set("X-Super-Properties", &quests::super_properties())
+            .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
+        *self.me_cache.lock().unwrap() = Some(v.clone());
+        Ok(v)
+    }
+
+    /// `/users/{id}/profile`, fetched once per session.
+    fn get_profile(&self) -> Result<Value, String> {
+        if let Some(v) = self.profile_cache.lock().unwrap().clone() {
+            return Ok(v);
+        }
+        let id = self.get_me()?["id"].as_str().unwrap_or("").to_string();
+        let v: Value = ureq::get(&format!(
+            "https://discord.com/api/v9/users/{id}/profile?with_mutual_guilds=false"
+        ))
+        .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
+        .set("X-Super-Properties", &quests::super_properties())
+        .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
+        *self.profile_cache.lock().unwrap() = Some(v.clone());
+        Ok(v)
     }
 
     pub fn fetch_quests(&self) -> Result<Vec<Quest>, String> {
@@ -32,46 +73,17 @@ impl DiscordClient {
         if self.token.is_empty() {
             return Err("no token".into());
         }
-        let me: Value = ureq::get("https://discord.com/api/v9/users/@me")
-            .set("Authorization", &self.token)
-            .set("User-Agent", CLIENT_UA)
-            .set("X-Super-Properties", &quests::super_properties())
-            .call()
-            .map_err(|e| e.to_string())?
-            .into_json()
-            .map_err(|e| e.to_string())?;
-        let id = me["id"].as_str().unwrap_or("").to_string();
+        let me = self.get_me()?;
+        let id = me["id"].as_str().unwrap_or("");
         // Discord snowflake epoch (2015-01-01) → account creation time.
-        let created_ms = id
-            .parse::<u64>()
-            .ok()
-            .map(|n| (n >> 22) + 1_420_070_400_000);
-
-        // The richer /profile endpoint carries premium tenure + boost dates.
-        let mut premium_guild_since = Value::Null;
-        let mut badges = Value::Array(vec![]);
-        if !id.is_empty() {
-            if let Ok(r) = ureq::get(&format!(
-                "https://discord.com/api/v9/users/{id}/profile?with_mutual_guilds=false"
-            ))
-            .set("Authorization", &self.token)
-            .set("User-Agent", CLIENT_UA)
-            .set("X-Super-Properties", &quests::super_properties())
-            .call()
-            {
-                if let Ok(p) = r.into_json::<Value>() {
-                    premium_guild_since = p["premium_guild_since"].clone();
-                    // The profile's own badge list: real icon hashes + descriptions.
-                    badges = p["badges"].clone();
-                }
-            }
-        }
+        let created_ms = id.parse::<u64>().ok().map(|n| (n >> 22) + 1_420_070_400_000);
+        let p = self.get_profile().unwrap_or(Value::Null);
         Ok(json!({
             "publicFlags": me["public_flags"].as_u64().unwrap_or(0),
             "premiumType": me["premium_type"].as_u64().unwrap_or(0),
-            "premiumGuildSince": premium_guild_since,
+            "premiumGuildSince": p["premium_guild_since"].clone(),
             "createdMs": created_ms,
-            "badges": badges,
+            "badges": p["badges"].clone(),
         }))
     }
 
@@ -82,17 +94,9 @@ impl DiscordClient {
         if self.token.is_empty() {
             return Err("no token".into());
         }
-        let me: Value = ureq::get("https://discord.com/api/v9/users/@me")
-            .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
-            .set("X-Super-Properties", &quests::super_properties())
-            .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
+        let me = self.get_me()?;
         let id = me["id"].as_str().unwrap_or("").to_string();
-        let prof: Value = ureq::get(&format!(
-            "https://discord.com/api/v9/users/{id}/profile?with_mutual_guilds=false"
-        ))
-        .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
-        .set("X-Super-Properties", &quests::super_properties())
-        .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
+        let prof = self.get_profile()?;
         let up = &prof["user_profile"];
 
         let ext = |h: &str| if h.starts_with("a_") { "gif" } else { "png" };
@@ -194,13 +198,7 @@ impl DiscordClient {
         if self.token.is_empty() {
             return Err("no token".into());
         }
-        let r = ureq::get("https://discord.com/api/v9/users/@me")
-            .set("Authorization", &self.token)
-            .set("User-Agent", CLIENT_UA)
-            .set("X-Super-Properties", &quests::super_properties())
-            .call()
-            .map_err(|e| e.to_string())?;
-        let v: Value = r.into_json().map_err(|e| e.to_string())?;
+        let v = self.get_me()?;
         let id = v["id"].as_str().unwrap_or("");
         let name = v["global_name"]
             .as_str()
@@ -332,6 +330,9 @@ impl DiscordClient {
         if self.token.is_empty() {
             return Err("no token".into());
         }
+        if let Some(cached) = self.catalog_cache.lock().unwrap().clone() {
+            return Ok(cached);
+        }
         let r = ureq::get("https://discord.com/api/v9/collectibles-categories/v2")
             .set("Authorization", &self.token)
             .set("User-Agent", CLIENT_UA)
@@ -448,7 +449,9 @@ impl DiscordClient {
                 }));
             }
         }
-        serde_json::to_string(&items).map_err(|e| e.to_string())
+        let json = serde_json::to_string(&items).map_err(|e| e.to_string())?;
+        *self.catalog_cache.lock().unwrap() = Some(json.clone());
+        Ok(json)
     }
 
     /// Fetch the collectibles shop and return every orb-purchasable, unowned item.

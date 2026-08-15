@@ -310,7 +310,9 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .wav-wrap{position:relative;width:132px;height:132px;border-radius:50%;display:grid;place-items:center}
 .wav-wrap::before{content:"";position:absolute;inset:-10px;border-radius:50%;
   background:conic-gradient(from 0deg,var(--accent),var(--accent-2),var(--accent));filter:blur(14px);opacity:.85;
-  animation:spin 6s linear infinite}
+  animation:spin 6s linear infinite;transition:opacity .5s var(--ease)}
+.wav-wrap.flying::before{opacity:0}
+.wav-wrap.flying .wav,.wav-wrap.flying .wav-fb{border-color:transparent;box-shadow:0 20px 50px -12px rgba(var(--accent-rgb),.7);transition:border-color .5s ease,box-shadow .6s ease}
 .wav,.wav-fb{position:relative;width:120px;height:120px;border-radius:50%;object-fit:cover;
   border:3px solid rgba(255,255,255,.14);background:var(--bg-1);box-shadow:var(--shadow);z-index:1;
   transform-origin:center;will-change:transform}
@@ -481,9 +483,9 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .hstats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 @media(max-width:720px){.hstats{grid-template-columns:repeat(2,1fr)}}
 /* homepage: profile card (left) + actions & stacked stats (right) */
-.home-top{display:grid;grid-template-columns:1.25fr 1fr;gap:18px;align-items:start}
+.home-top{display:grid;grid-template-columns:360px 1fr;gap:26px;align-items:start}
 @media(max-width:860px){.home-top{grid-template-columns:1fr}}
-.home-profile{min-width:0}
+.home-profile{width:360px;max-width:100%}
 .home-side{display:flex;flex-direction:column;gap:14px}
 .home-welcome{padding:16px 18px;border-radius:var(--radius);
   background:linear-gradient(135deg,rgba(var(--accent-rgb),.16),rgba(52,211,153,.08)),var(--glass);border:1px solid var(--stroke)}
@@ -747,9 +749,12 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .who-row{display:flex;align-items:center;gap:12px;margin-top:8px}
 .who-av{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;background:linear-gradient(140deg,var(--accent),var(--accent-2));font-family:"Bricolage Grotesque",system-ui}
 .who-n{font-size:16px;font-weight:800}
-.who-l{font-size:13px;color:var(--accent);font-weight:650;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.who-info{display:flex;flex-direction:column;gap:3px}
+.who-l{font-size:13px;color:var(--accent);font-weight:650;display:inline-flex;align-items:center;gap:4px;cursor:pointer;width:max-content}
 .who-l:hover{text-decoration:underline}
 .who-l svg{width:12px;height:12px}
+.who-dc{font-size:13px;color:var(--text-dim);font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.who-dc svg{color:#5865f2}
 .patch{padding:16px;border-radius:var(--radius);background:var(--glass);border:1px solid var(--stroke)}
 .patch-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .patch-h h3{font-size:15px;font-weight:750}
@@ -793,10 +798,11 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .prof-left{min-width:0}
 .prof-right{position:sticky;top:14px;align-self:start;overflow:hidden}
 .pp-scale{display:flex;flex-direction:column;gap:12px;transform-origin:top center}
-.panel-back{display:flex;align-items:center;gap:8px;margin:0 0 14px;color:var(--text);font-size:15px;font-weight:750;
-  padding:8px 12px 8px 8px;border-radius:11px;transition:.15s var(--ease)}
-.panel-back:hover{background:var(--glass)}
+.panel-back{position:sticky;top:0;z-index:6;display:flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--text);font-size:15px;font-weight:750;
+  padding:12px 12px 12px 8px;border-radius:11px;background:var(--bg-0);box-shadow:0 6px 12px -8px var(--bg-0);transition:color .15s var(--ease)}
+.panel-back:hover{color:var(--accent)}
 .panel-back svg{color:var(--text-mute)}
+.panel-back:hover svg{color:var(--accent)}
 .studio3{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
 @media(max-width:940px){.studio3{grid-template-columns:1fr}}
 .pcust3{display:flex;flex-direction:column;gap:16px}
@@ -1031,6 +1037,13 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.4.0',d:'15 Aug 2026',notes:[
+    'Picking an item no longer jumps back to the top, and the back button is pinned so you can keep browsing',
+    'Far fewer requests to Discord (cached catalog, profile & account lookups) to avoid rate limits — plus a Refresh button on the error screen',
+    'Redesigned homepage: your framed profile is the same size as the studio preview, on the left, with a cleaner layout',
+    'Settings "Made By" now shows Cam, camwooloo.com and my Discord tag',
+    'A smoother, more professional launch animation — your avatar glides into your profile',
+  ]},
   {v:'0.3.9',d:'15 Aug 2026',notes:[
     'Avatar decorations now animate in the preview and pickers',
     'Wishlist items with ♥ straight from the customizer cards, not just inside the pickers',
@@ -1163,23 +1176,24 @@ function maybeFinish(){
 }
 function finishIntro(){
   const app=byId('app'); app.classList.add('reveal');
-  const wa=byId(byId('bootWelcome').classList.contains('noimg')?'wAvatarFallback':'wAvatar');
-  const ra=byId('railAvatar');
-  ra.classList.add('show');
-  // Flip the welcome avatar to the HOMEPAGE hero spot (rail avatar also appears).
+  const wrap=byId('bootWelcome').classList.contains('noimg')?byId('wAvatarFallback').parentElement:byId('wAvatar').parentElement;
+  const ra=byId('railAvatar'); ra.classList.add('show');
+  // Fly the welcome avatar smoothly into the home profile card's avatar.
   const target=byId('homeAvatar')||ra;
   try{
-    const a=wa.getBoundingClientRect(), b=target.getBoundingClientRect();
+    const a=wrap.getBoundingClientRect(), b=target.getBoundingClientRect();
     const dx=(b.left+b.width/2)-(a.left+a.width/2);
     const dy=(b.top+b.height/2)-(a.top+a.height/2);
     const sc=b.width/a.width;
     if(target!==ra) target.style.visibility='hidden';
-    wa.style.transition='transform .85s var(--spring),opacity .4s ease .6s';
-    wa.style.transform='translate('+dx+'px,'+dy+'px) scale('+sc+')';
-    byId('wName').style.transition='opacity .3s'; byId('wName').style.opacity='0';
-    byId('wText').style.opacity='0'; byId('wText').style.transition='opacity .3s';
+    // text lifts away first, then the avatar glides + settles into place
+    byId('wText').style.cssText+=';transition:opacity .3s ease,transform .4s var(--ease);opacity:0;transform:translateY(-10px)';
+    byId('wName').style.cssText+=';transition:opacity .3s ease,transform .4s var(--ease);opacity:0;transform:translateY(-10px)';
+    wrap.style.transition='transform .95s cubic-bezier(.66,0,.24,1)';
+    wrap.style.transform='translate('+dx+'px,'+dy+'px) scale('+sc+')';
+    wrap.classList.add('flying');
   }catch(e){}
-  setTimeout(()=>{ const t=byId('homeAvatar'); if(t) t.style.visibility='visible'; byId('boot').classList.add('hide'); },820);
+  setTimeout(()=>{ const t=byId('homeAvatar'); if(t) t.style.visibility='visible'; byId('boot').classList.add('hide'); },880);
   setTimeout(()=>{ byId('boot').style.display='none'; maybeSplash(); },1500);
 }
 function onData(){
@@ -1197,7 +1211,8 @@ function noWelcomeDismiss(){
 /* ====================== inbound from Rust ====================== */
 window.setQuests=function(list){ GOT=true; QUESTS=list||[]; syncAuto(); syncAutoPlay(); render(); onData(); };
 window.setError=function(msg){ GOT=true;
-  byId('content').innerHTML='<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t read your quests</h2><p>'+esc(niceError(msg))+'</p><p>Make sure Discord is installed and you are signed in, then hit refresh.</p></div>';
+  byId('content').innerHTML='<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t read your quests</h2><p>'+esc(niceError(msg))+'</p><p>Make sure Discord is installed and you are signed in, then try again.</p>'
+    +'<button class="act primary" style="width:auto;margin:16px auto 0;padding:0 22px;height:44px" onclick="rescan()">'+ICO.refresh+'Refresh</button></div>';
   finished=true; noWelcomeDismiss();
 };
 window.setSettings=function(s){ SET=Object.assign(SET,s||{}); applyTheme();
@@ -1704,7 +1719,7 @@ function equippedProfile(){
     +'<div class="ppreview pp-static" style="--pt:'+esc(pt)+';--pt2:'+esc(pt2)+';'+((fl&&fl.length)?frameMargin(e.frameMetrics):'')+'">'
     +fx
     +'<div class="pp-banner" style="'+bstyle+'"></div>'
-    +'<div class="pp-avwrap"><div class="pp-av">'+(av?'<img src="'+esc(av)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>')+'</div>'
+    +'<div class="pp-avwrap"><div class="pp-av" id="homeAvatar">'+(av?'<img src="'+esc(av)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>')+'</div>'
       +(e.decoration?'<div class="pp-deco" style="display:block;background-image:url(\''+esc(e.decoration)+'\')"></div>':'')
       +'<span class="pp-status"></span></div>'
     +'<div class="pp-body">'
@@ -1794,10 +1809,9 @@ function customizerCards(){
 // The left customizer — either the cards, or an in-place panel for the item
 // you're changing (so the right-hand preview stays perfectly visible).
 function studioHtml(){
-  return '<div class="hsec-head" style="margin-bottom:12px"><h3>Profile studio</h3>'
-      +(custView?'':'<button class="viewall" onclick="stuReset()">Reset all</button>')+'</div>'
-    +(custView?panelHtml(custView)
-      :('<div class="hempty" style="margin:2px 0 14px">Click any item to change it — the preview stays locked on the right.</div>'+customizerCards()));
+  if(custView) return panelHtml(custView);
+  return '<div class="hsec-head" style="margin-bottom:12px"><h3>Profile studio</h3><button class="viewall" onclick="stuReset()">Reset all</button></div>'
+    +'<div class="hempty" style="margin:2px 0 14px">Click any item to change it — the preview stays locked on the right.</div>'+customizerCards();
 }
 const THEMESW=['#5865f2','#b794f6','#34d399','#22d3ee','#f472b6','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#111827'];
 
@@ -2006,7 +2020,8 @@ const ICO={
   refresh:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4.5V10H15"/></svg>',
   close:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   heart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5l-1.5-1.35C5.4 14.6 2.5 12 2.5 8.75 2.5 6.4 4.4 4.5 6.75 4.5c1.4 0 2.75.66 3.6 1.7l.65.8.65-.8A4.7 4.7 0 0117.25 4.5c2.35 0 4.25 1.9 4.25 4.25 0 3.25-2.9 5.85-8 10.4z"/></svg>',
-  back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
+  back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  discord:'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.6 5.6A17 17 0 0015.4 4.3l-.2.4a12.8 12.8 0 00-6.4 0l-.2-.4A17 17 0 004.4 5.6C1.9 9.3 1.2 12.9 1.5 16.4a17.2 17.2 0 005.2 2.6l.5-.7c-.7-.3-1.4-.6-2-1l.5-.4c3.9 1.8 8.1 1.8 12 0l.5.4c-.6.4-1.3.7-2 1l.5.7a17 17 0 005.2-2.6c.4-4-.7-7.6-3.5-10.8zM8.5 14.3c-1 0-1.9-.9-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1zm7 0c-1 0-1.9-.9-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1z"/></svg>'
 };
 
 function counts(){
@@ -2024,7 +2039,10 @@ function render(){
   if(NAV==='badges'){ c.innerHTML=badgesHtml(); return; }
   if(NAV==='history'){ c.innerHTML=historyHtml(); return; }
   if(NAV==='misc'){ c.innerHTML=miscHtml(); return; }
-  if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); fitPreview(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
+  if(NAV==='profile'){ const ps=(document.querySelector('.prof-left')||{}).scrollTop||0;
+    c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); fitPreview();
+    requestAnimationFrame(function(){ const nl=document.querySelector('.prof-left'); if(nl) nl.scrollTop=ps; });
+    if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
   if(NAV==='home'){ c.innerHTML=homeHtml(); if(SHOP===null&&!shopLoading){ shopLoading=true; send('loadShop'); } return; }
   if(!GOT) return;
   const list=visible();
@@ -2132,7 +2150,10 @@ function settingsSide(){
   const items=CHANGELOG.map(patchEntry).join('');
   return '<div class="set-side">'
     +'<div class="who"><div class="who-t">MADE BY</div><div class="who-row"><div class="who-av">C</div>'
-      +'<div><div class="who-n">camwooloo</div><span class="who-l" onclick="send(\'openExternal\',{url:\'https://camwooloo.com\'})">camwooloo.com '+ICO.ext+'</span></div></div></div>'
+      +'<div class="who-info"><div class="who-n">Cam</div>'
+        +'<span class="who-l" onclick="send(\'openExternal\',{url:\'https://camwooloo.com\'})">camwooloo.com '+ICO.ext+'</span>'
+        +'<span class="who-dc">'+ICO.discord+' '+esc((EQUIPPED&&EQUIPPED.username)||'kda.')+'</span>'
+      +'</div></div></div>'
     +'<div class="patch"><div class="patch-h"><h3>Patch notes</h3><button class="chk-upd" onclick="checkUpdateNow()">Check for updates</button></div>'
       +items+'</div>'
   +'</div>';
