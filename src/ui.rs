@@ -791,7 +791,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .prof2col{display:grid;grid-template-columns:1fr 360px;gap:26px;align-items:start}
 @media(max-width:940px){.prof2col{grid-template-columns:1fr}}
 .prof-left{min-width:0}
-.prof-right{position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:12px}
+.prof-right{position:sticky;top:14px;align-self:start;overflow:hidden}
+.pp-scale{display:flex;flex-direction:column;gap:12px;transform-origin:top center}
 .panel-back{display:flex;align-items:center;gap:8px;margin:0 0 14px;color:var(--text);font-size:15px;font-weight:750;
   padding:8px 12px 8px 8px;border-radius:11px;transition:.15s var(--ease)}
 .panel-back:hover{background:var(--glass)}
@@ -1026,6 +1027,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.8',d:'15 Aug 2026',notes:[
+    'The profile preview + nameplate are now truly locked on the right and scaled to fit the window — they no longer scroll away or get cut off',
+  ]},
   {v:'0.3.7',d:'15 Aug 2026',notes:[
     'Equipped profile frame now actually renders on Home and the preview (a display bug was hiding it) and wraps the card cleanly',
     'The locked preview + nameplate now scale to always fit the window — no scrolling needed to see both',
@@ -1599,15 +1603,19 @@ function stuExport(kind){
   img.onerror=()=>toast('Upload an image first');
   img.src=STU[kind]||''; if(!STU[kind]) toast('Upload a '+kind+' first');
 }
-// Scale the locked right-hand preview column so preview + nameplate always fit
-// the window without scrolling.
+// Scale the locked right-hand preview so preview + nameplate always fit the
+// window fully — then it's sticky, so it never scrolls out of view.
 function fitPreview(){
   const col=byId('profRight'), c=byId('content'); if(!col||!c) return;
-  col.style.transform='none';
-  requestAnimationFrame(function(){
-    const avail=c.clientHeight-24, h=col.scrollHeight;
-    if(h>avail){ col.style.transformOrigin='top center'; col.style.transform='scale('+Math.max(0.5,avail/h).toFixed(3)+')'; }
-  });
+  let sc=col.querySelector('.pp-scale');
+  if(!sc){ sc=document.createElement('div'); sc.className='pp-scale'; while(col.firstChild) sc.appendChild(col.firstChild); col.appendChild(sc); }
+  const doFit=function(){ sc.style.transform='none'; col.style.height='';
+    const avail=c.clientHeight-20, h=sc.scrollHeight;
+    const s=h>avail?Math.max(0.55,avail/h):1;
+    sc.style.transform='scale('+s.toFixed(3)+')'; col.style.height=Math.ceil(h*s)+'px';
+  };
+  requestAnimationFrame(doFit); setTimeout(doFit,300); setTimeout(doFit,900);
+  col.querySelectorAll('img,video').forEach(function(el){ el.addEventListener('load',doFit); el.addEventListener('loadeddata',doFit); });
 }
 window.addEventListener('resize',function(){ if(NAV==='profile') fitPreview(); });
 function setupStuDrag(){
