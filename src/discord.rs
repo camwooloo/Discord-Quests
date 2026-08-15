@@ -412,6 +412,11 @@ impl DiscordClient {
                     item0["asset"].as_str().map(|a| {
                         format!("https://cdn.discordapp.com/assets/collectibles/{a}asset.webm")
                     })
+                } else if ptype == 0 {
+                    // Avatar decorations animate via their APNG preset asset.
+                    item0["asset"].as_str().map(|a| {
+                        format!("https://cdn.discordapp.com/avatar-decoration-presets/{a}.png?size=240")
+                    })
                 } else {
                     None
                 };

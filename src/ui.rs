@@ -800,12 +800,16 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .studio3{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
 @media(max-width:940px){.studio3{grid-template-columns:1fr}}
 .pcust3{display:flex;flex-direction:column;gap:16px}
-.cust3{background:var(--glass);border:1px solid var(--stroke);border-radius:16px;padding:16px}
+.cust3{position:relative;background:var(--glass);border:1px solid var(--stroke);border-radius:16px;padding:16px}
 .cust3-h{font-size:13px;font-weight:800;letter-spacing:.3px;color:var(--text-dim);margin-bottom:11px;text-transform:uppercase}
 .cthumb-row{display:flex;gap:12px}
-.cthumb{flex:1;display:flex;flex-direction:column;gap:9px;align-items:center;padding:12px;border-radius:13px;
+.cthumb{flex:1;position:relative}
+.cthumb-b{width:100%;display:flex;flex-direction:column;gap:9px;align-items:center;padding:12px;border-radius:13px;
   background:var(--glass-2);border:1px solid var(--stroke);transition:.15s var(--ease)}
-.cthumb:hover{border-color:rgba(var(--accent-rgb),.6);transform:translateY(-2px)}
+.cthumb-b:hover{border-color:rgba(var(--accent-rgb),.6);transform:translateY(-2px)}
+.card-wish{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;z-index:3;
+  background:rgba(5,6,13,.55);color:var(--text-mute);border:1px solid var(--stroke);transition:.14s var(--ease)}
+.card-wish:hover{color:#ff5c8a;border-color:rgba(255,92,138,.5)}.card-wish.on{color:#ff5c8a;border-color:rgba(255,92,138,.5)}
 .cthumb-img{width:76px;height:76px;border-radius:14px;background:center/contain no-repeat var(--bg-1);border:1px solid var(--stroke);display:grid;place-items:center}
 .cthumb-img.ph{background:repeating-conic-gradient(rgba(255,255,255,.05) 0% 25%,transparent 0% 50%) 0/14px 14px}
 .cthumb-l{font-size:12.5px;font-weight:700;color:var(--text)}
@@ -1027,6 +1031,13 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.9',d:'15 Aug 2026',notes:[
+    'Avatar decorations now animate in the preview and pickers',
+    'Wishlist items with ♥ straight from the customizer cards, not just inside the pickers',
+    'The profile page no longer scrolls on the right at all — the customizer scrolls inside the left column, preview + nameplate stay locked',
+    'The sidebar profile picture always shows now (falls back to your initial while the image loads)',
+    'Rate-limit and API errors now show a clean, friendly message instead of raw text',
+  ]},
   {v:'0.3.8',d:'15 Aug 2026',notes:[
     'The profile preview + nameplate are now truly locked on the right and scaled to fit the window — they no longer scroll away or get cut off',
   ]},
@@ -1082,7 +1093,7 @@ const CHANGELOG=[
 ];
 let pType=0, pName='', pDetails='', pState='';
 let pLargeImg='', pLargeText='', pSmallImg='', pSmallText='';
-let STU={avatar:'',banner:'',deco:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,
+let STU={avatar:'',banner:'',deco:'',decoAnim:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,
   avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,
   bnBright:100,bnContrast:100,bnSat:100,bnHue:0,
   nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',open:'avatar',drag:false};
@@ -1121,17 +1132,18 @@ window.setUser=function(u){
   if(userShown) return; userShown=true; USER=u;
   const initial=(u&&u.name?u.name.trim()[0]:'?').toUpperCase();
   const bw=byId('bootWelcome');
+  byId('railAvatar').style.display='';
+  byId('railAvatarFallback').textContent=initial; // always have the initial ready underneath
   if(u&&u.avatar){
     byId('wAvatar').src=u.avatar;
     byId('wAvatar').onerror=()=>bw.classList.add('noimg');
-    byId('railAvatarImg').src=u.avatar;
-    byId('railAvatar').style.display='';
-    byId('railAvatarImg').style.display='';
-    byId('railAvatarFallback').textContent='';
+    const ri=byId('railAvatarImg');
+    ri.onload=()=>{ ri.style.display=''; byId('railAvatarFallback').textContent=''; };
+    ri.onerror=()=>{ ri.style.display='none'; byId('railAvatarFallback').textContent=initial; };
+    ri.style.display='none'; ri.src=u.avatar; // stays hidden (initial shows) until it loads
   } else {
     bw.classList.add('noimg');
     byId('railAvatarImg').style.display='none';
-    byId('railAvatarFallback').textContent=initial;
   }
   byId('wAvatarFallback').textContent=initial;
   byId('wName').textContent=(u&&u.name)?u.name:'there';
@@ -1185,7 +1197,7 @@ function noWelcomeDismiss(){
 /* ====================== inbound from Rust ====================== */
 window.setQuests=function(list){ GOT=true; QUESTS=list||[]; syncAuto(); syncAutoPlay(); render(); onData(); };
 window.setError=function(msg){ GOT=true;
-  byId('content').innerHTML='<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t read your quests</h2><p>'+esc(msg)+'</p><p>Make sure Discord is installed and you are signed in, then hit refresh.</p></div>';
+  byId('content').innerHTML='<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t read your quests</h2><p>'+esc(niceError(msg))+'</p><p>Make sure Discord is installed and you are signed in, then hit refresh.</p></div>';
   finished=true; noWelcomeDismiss();
 };
 window.setSettings=function(s){ SET=Object.assign(SET,s||{}); applyTheme();
@@ -1213,7 +1225,7 @@ window.setEquipped=function(e){ EQUIPPED=e||null; seedStudioFromEquipped(); if(N
 // you haven't already customised (so a saved look still wins).
 function seedStudioFromEquipped(){
   const e=EQUIPPED; if(!e) return;
-  if(e.decoration&&!STU.deco) STU.deco=e.decoration;
+  if(e.decoration&&!STU.deco){ STU.deco=e.decoration; STU.decoAnim=e.decoration; }
   if(e.nameplate&&!STU.nameplate){ STU.nameplate=e.nameplate; STU.nameplateVideo=e.nameplateVideo||''; }
   if(e.effectAnim&&e.effectAnim.length&&!STU.effectAnim) STU.effectAnim=e.effectAnim;
   if(e.frameLayers&&e.frameLayers.length&&!(STU.frameLayers&&STU.frameLayers.length)){ STU.frameLayers=e.frameLayers; STU.frameMetrics=e.frameMetrics; STU.frame=STU.frame||'__equipped__'; }
@@ -1308,7 +1320,7 @@ window.updateProgress=function(id,progress,target,completed){
   }
   if(NAV==='claim') render();
 };
-window.progressError=function(id,msg){ if(CUR&&CUR.id===id) byId('dockStatus').textContent='Discord: '+msg; };
+window.progressError=function(id,msg){ if(CUR&&CUR.id===id) byId('dockStatus').textContent=niceError(msg); };
 // Record a completed quest toward all-time stats (once per quest).
 let countedStats=new Set();
 function onCompleted(q){
@@ -1504,7 +1516,7 @@ function applyNameStyle(){ const el=byId('stName'); if(!el) return; el.style.fon
 function decorateNameTiles(){ const cc=NCOLORS[STU.nameColor||0]||NCOLORS[0]; NEFFECTS.forEach(e=>{ const el=byId('efs_'+e[0]); if(el) applyEffectStyle(el,e[0],cc); }); }
 // Persist the studio look (debounced) so it's remembered across launches.
 let studioSaveT=0;
-function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,nameplateVideo:STU.nameplateVideo,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
+function studioBlob(){ return {deco:STU.deco,decoAnim:STU.decoAnim,nameplate:STU.nameplate,nameplateVideo:STU.nameplateVideo,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
   nameFont:STU.nameFont,nameEffect:STU.nameEffect,nameColor:STU.nameColor,themeA:STU.themeA,themeB:STU.themeB,open:STU.open,
   avBright:STU.avBright,avContrast:STU.avContrast,avSat:STU.avSat,avHue:STU.avHue,zoom:STU.zoom,
   bnBright:STU.bnBright,bnContrast:STU.bnContrast,bnSat:STU.bnSat,bnHue:STU.bnHue,wishlist:WISHLIST}; }
@@ -1549,7 +1561,7 @@ function stuApply(){
   if(av){ av.style.filter=stuFilterAv(); av.style.backgroundImage=STU.avatar?'url("'+STU.avatar+'")':''; av.style.backgroundSize=STU.zoom+'%'; av.style.backgroundPosition=STU.posX+'% '+STU.posY+'%'; }
   if(bn){ bn.style.filter=stuFilterBn(); bn.style.backgroundImage=STU.banner?'url("'+STU.banner+'")':''; }
   const set=(id,url)=>{ const e=byId(id); if(e){ e.style.backgroundImage=url?'url("'+url+'")':''; e.style.display=url?'block':'none'; } };
-  set('stDeco',STU.deco);
+  set('stDeco',STU.decoAnim||STU.deco);
   fxRender(byId('stEffect'),STU.effectAnim,STU.effect);
   frameRender(STU.frameLayers);
   applyNameStyle();
@@ -1565,13 +1577,14 @@ function stuUpload(kind){
 function catItem(sku){ return (CATALOG||SHOP||[]).find(i=>i.sku===sku); }
 // Toggle a collectible selection (deco/nameplate/effect/frame) by SKU.
 function stuPick(kind,sku){
-  if(!sku){ STU[kind]=''; if(kind==='frame'){STU.frameLayers=null;STU.frameMetrics=null;} if(kind==='effect')STU.effectAnim=null; if(kind==='nameplate')STU.nameplateVideo=''; stuApply(); saveStudio(); render(); return; }
+  if(!sku){ STU[kind]=''; if(kind==='frame'){STU.frameLayers=null;STU.frameMetrics=null;} if(kind==='effect')STU.effectAnim=null; if(kind==='nameplate')STU.nameplateVideo=''; if(kind==='deco')STU.decoAnim=''; stuApply(); saveStudio(); render(); return; }
   const it=catItem(sku); if(!it) return;
   const same=STU[kind]===it.image;
   STU[kind]=same?'':it.image;
   if(kind==='frame'){ STU.frameLayers=same?null:(it.layers||null); STU.frameMetrics=same?null:(it.metrics||null); }
   if(kind==='effect') STU.effectAnim=same?null:(it.anim||null);
   if(kind==='nameplate') STU.nameplateVideo=same?'':(it.video||'');
+  if(kind==='deco') STU.decoAnim=same?'':(it.video||'');
   stuApply(); saveStudio(); render();
 }
 function stuFont(id){ STU.nameFont=id; applyNameStyle(); saveStudio(); render(); }
@@ -1582,7 +1595,7 @@ function stuTheme(which,hex){ const k='theme'+which; STU[k]=(STU[k]===hex?'':hex
 function stuThemeVal(which,hex,el){ STU['theme'+which]=hex; stuApply(); saveStudio(); if(el){ const l=el.parentElement.querySelector('.colhex'); if(l) l.textContent=hex; } }
 function stuOpen(s){ STU.open=(STU.open===s?'':s); saveStudio(); render(); }
 function stuReset(){
-  Object.assign(STU,{deco:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
+  Object.assign(STU,{deco:'',decoAnim:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
     avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,bnBright:100,bnContrast:100,bnSat:100,bnHue:0});
   saveStudio(); render(); toast('Reset to default');
 }
@@ -1603,15 +1616,20 @@ function stuExport(kind){
   img.onerror=()=>toast('Upload an image first');
   img.src=STU[kind]||''; if(!STU[kind]) toast('Upload a '+kind+' first');
 }
-// Scale the locked right-hand preview so preview + nameplate always fit the
-// window fully — then it's sticky, so it never scrolls out of view.
+// Lock the right-hand preview: the page itself doesn't scroll — the customizer
+// scrolls inside the left column, while the preview + nameplate are scaled to
+// fit the window and stay put.
 function fitPreview(){
-  const col=byId('profRight'), c=byId('content'); if(!col||!c) return;
+  const col=byId('profRight'), c=byId('content'), grid=document.querySelector('.prof2col'), left=document.querySelector('.prof-left');
+  if(!col||!c||!grid||!left) return;
   let sc=col.querySelector('.pp-scale');
   if(!sc){ sc=document.createElement('div'); sc.className='pp-scale'; while(col.firstChild) sc.appendChild(col.firstChild); col.appendChild(sc); }
-  const doFit=function(){ sc.style.transform='none'; col.style.height='';
-    const avail=c.clientHeight-20, h=sc.scrollHeight;
-    const s=h>avail?Math.max(0.55,avail/h):1;
+  const doFit=function(){
+    const H=c.clientHeight-40;            // fill the content area exactly → no page scroll
+    grid.style.height=H+'px';
+    left.style.overflowY='auto'; left.style.height='100%'; left.style.paddingRight='8px';
+    sc.style.transform='none'; col.style.height='';
+    const avail=H-6, h=sc.scrollHeight, s=h>avail?Math.max(0.5,avail/h):1;
     sc.style.transform='scale('+s.toFixed(3)+')'; col.style.height=Math.ceil(h*s)+'px';
   };
   requestAnimationFrame(doFit); setTimeout(doFit,300); setTimeout(doFit,900);
@@ -1748,28 +1766,30 @@ function setupStickyPreview(){
   };
   c.addEventListener('scroll',c._ppScroll); c._ppScroll();
 }
-// A large square thumbnail button that opens a picker; shows the current pick.
-function cThumb(onclick,img,label,fallback){
+// The sku (if any) of the currently-selected item of a kind, and a wishlist ♥.
+function currentSku(kind){ const it=(CATALOG||[]).find(i=>i.kind===kind&&i.image===STU[kind]); return it?it.sku:''; }
+function cardWish(kind){ const sku=currentSku(kind); if(!sku) return ''; return '<button class="card-wish'+(isWished(sku)?' on':'')+'" title="Add to wishlist" onclick="event.stopPropagation();wishToggle(\''+esc(sku)+'\')">'+ICO.heart+'</button>'; }
+// A large thumbnail that opens a picker; shows the current pick + a wishlist ♥.
+function cThumb(onclick,img,label,fallback,wishKind){
   const inner=img?'<span class="cthumb-img" style="background-image:url(\''+esc(img)+'\')"></span>':'<span class="cthumb-img ph">'+(fallback||'')+'</span>';
-  return '<button class="cthumb" onclick="'+onclick+'">'+inner+'<span class="cthumb-l">'+label+'</span></button>';
+  return '<div class="cthumb"><button class="cthumb-b" onclick="'+onclick+'">'+inner+'<span class="cthumb-l">'+label+'</span></button>'+(wishKind?cardWish(wishKind):'')+'</div>';
 }
 function customizerCards(){
   const npBar=(STU.nameplate||STU.nameplateVideo)?nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo):'<div class="np-preview"><div class="np-row"><div class="np-av"><span>'+(((USER&&USER.name)||'Y').charAt(0).toUpperCase())+'</span></div><div class="np-name">'+esc((USER&&USER.name)||'You')+'</div></div></div>';
-  const nameSw=nameStyleSwatch();
   const themeThumb=(STU.themeA||STU.themeB)?'<span class="cthumb-img" style="background:linear-gradient(160deg,'+(STU.themeA||'#2a2c38')+','+(STU.themeB||STU.themeA||'#14151c')+')"></span>':'<span class="cthumb-img ph"></span>';
-  return '<div class="cust3"><div class="cust3-h">Nameplate</div>'
+  return '<div class="cust3"><div class="cust3-h">Nameplate'+cardWish('nameplate')+'</div>'
       +'<button class="npcard" onclick="openPick(\'nameplate\')">'+npBar+'</button></div>'
     +'<div class="cust3"><div class="cust3-h">Avatar &amp; Decoration</div><div class="cthumb-row">'
       +cThumb('openAvatar()',STU.avatar,'Avatar','<span class="mini ph"></span>')
-      +cThumb("openPick('deco')",STU.deco,'Decoration','')+'</div></div>'
+      +cThumb("openPick('deco')",STU.decoAnim||STU.deco,'Decoration','','deco')+'</div></div>'
     +'<div class="cust3"><div class="cust3-h">Display Name Style</div>'
       +'<button class="nscard" onclick="openNameStyle()"><span class="nscard-n" id="nsCardName">'+esc((USER&&USER.name)||'You')+'</span></button></div>'
     +'<div class="cust3"><div class="cust3-h">Theme &amp; Banner</div><div class="cthumb-row">'
-      +'<button class="cthumb" onclick="openTheme()">'+themeThumb+'<span class="cthumb-l">Theme</span></button>'
+      +'<div class="cthumb"><button class="cthumb-b" onclick="openTheme()">'+themeThumb+'<span class="cthumb-l">Theme</span></button></div>'
       +cThumb('openBanner()',STU.banner,'Banner','')+'</div></div>'
     +'<div class="cust3"><div class="cust3-h">Profile Effect &amp; Frame</div><div class="cthumb-row">'
-      +cThumb("openPick('effect')",STU.effect,'Effect','')
-      +cThumb("openPick('frame')",STU.frame&&STU.frame!=='__equipped__'?STU.frame:'','Frame','')+'</div></div>';
+      +cThumb("openPick('effect')",STU.effect,'Effect','','effect')
+      +cThumb("openPick('frame')",STU.frame&&STU.frame!=='__equipped__'?STU.frame:'','Frame','','frame')+'</div></div>';
 }
 // The left customizer — either the cards, or an in-place panel for the item
 // you're changing (so the right-hand preview stays perfectly visible).
@@ -2151,7 +2171,7 @@ function shopVisible(){
 }
 function shopHtml(){
   if(shopLoading||SHOP===null) return '<div class="mid"><div class="spin"></div><p>Loading the Orb Shop…</p></div>';
-  if(shopErr) return '<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t load the shop</h2><p>'+esc(shopErr)+'</p></div>';
+  if(shopErr) return '<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t load the shop</h2><p>'+esc(niceError(shopErr))+'</p></div>';
   const chips=SHOP_CATS.map(([k,l])=>'<button class="chip '+(shopFilter===k?'on':'')+'" onclick="setShopFilter(\''+k+'\')">'+l+'</button>').join('')
     +'<button class="chip'+(shopAfford?' on':'')+'" onclick="toggleAfford()" data-tip="Only items you can afford">✓ Affordable</button>';
   const bar='<div class="shopbar"><div class="chips">'+chips+'</div><div class="grow"></div>'
@@ -2334,6 +2354,15 @@ let toastT;
 function toast(msg,kind){
   const t=byId('toast'); t.textContent=msg; t.className='toast show '+(kind||'');
   clearTimeout(toastT); toastT=setTimeout(()=>t.className='toast '+(kind||''),3200);
+}
+// Turn raw API errors (rate-limit JSON, etc.) into a short, friendly line.
+function niceError(m){
+  const s=''+(m||''), l=s.toLowerCase();
+  if(l.includes('429')||l.includes('too many')||l.includes('rate limit')||l.includes('retry_after')) return 'Discord is rate-limiting requests — give it a moment and try again.';
+  if(l.includes('captcha')) return 'Discord wants a captcha for this one — claim it in Discord.';
+  if(l.includes('401')||l.includes('unauthor')||l.includes('invalid token')) return 'Couldn\'t authenticate with Discord — make sure you\'re signed in.';
+  if(l.includes('network')||l.includes('timed out')||l.includes('dns')||l.includes('connection')) return 'Network hiccup reaching Discord — check your connection.';
+  return s.length>110?s.slice(0,107)+'…':s;
 }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ byId('sortMenu').classList.remove('open'); showDock(false);} });
 
