@@ -123,18 +123,26 @@ impl DiscordClient {
             .as_str()
             .and_then(|sku| find(sku).map(|it| it["anim"].clone()))
             .unwrap_or(Value::Null);
+        // The equipped frame lives in user_profile.collectibles (type 3), not
+        // me.collectibles. Resolve its layers + geometry from the catalog.
         let (mut frame_layers, mut frame_metrics) = (Value::Null, Value::Null);
-        if let Some(cols) = me["collectibles"].as_object() {
-            for v in cols.values() {
-                if let Some(it) = v["sku_id"].as_str().and_then(&find) {
-                    if it["kind"].as_str() == Some("frame") {
-                        frame_layers = it["layers"].clone();
-                        frame_metrics = it["metrics"].clone();
-                        break;
-                    }
-                }
-            }
+        let frame_sku = up["collectibles"]
+            .as_array()
+            .and_then(|a| a.iter().find(|c| c["type"].as_i64() == Some(3)))
+            .and_then(|c| c["sku_id"].as_str());
+        if let Some(it) = frame_sku.and_then(&find) {
+            frame_layers = it["layers"].clone();
+            frame_metrics = it["metrics"].clone();
         }
+        // Server (clan) tag + its badge icon, shown next to the name on Discord.
+        let clan = if me["clan"]["tag"].is_string() { &me["clan"] } else { &me["primary_guild"] };
+        let tag = clan["tag"].as_str().filter(|s| !s.is_empty());
+        let tag_icon = match (clan["identity_guild_id"].as_str(), clan["badge"].as_str()) {
+            (Some(g), Some(b)) => {
+                Some(format!("https://cdn.discordapp.com/clan-badges/{g}/{b}.png?size=24"))
+            }
+            _ => None,
+        };
         fn hexc(v: &Value) -> Option<String> {
             v.as_u64().map(|n| format!("#{:06x}", n & 0xff_ffff))
         }
@@ -160,6 +168,7 @@ impl DiscordClient {
             "nameColors": ncolors,
             "pronouns": up["pronouns"].as_str().unwrap_or(""),
             "bio": up["bio"].as_str().unwrap_or(""),
+            "tag": tag, "tagIcon": tag_icon,
             "connections": connections,
         })
         .to_string())

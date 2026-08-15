@@ -671,7 +671,10 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .pp-body{position:relative;z-index:5;padding:10px 22px 22px}
 .pp-nameplate{position:absolute;left:0;right:0;top:2px;height:44px;background:center/cover no-repeat;border-radius:10px;display:none;z-index:-1;opacity:.9}
 .pp-name{font-size:22px;font-weight:800;letter-spacing:-.3px;font-family:"Bricolage Grotesque",system-ui}
-.pp-tag{font-size:13px;color:var(--text-dim);margin:1px 0 8px}.pp-tag span{color:var(--text-mute)}
+.pp-tag{font-size:13px;color:var(--text-dim);margin:1px 0 8px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pp-servertag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:#fff;
+  background:var(--glass-2);border:1px solid var(--stroke);padding:2px 7px;border-radius:7px}
+.pp-servertag img{width:14px;height:14px;border-radius:3px}
 .ppreview .hbadges{margin:2px 0 4px}
 .pp-btns{display:flex;gap:8px;margin:12px 0 6px}
 .pp-btn{height:34px;padding:0 14px;border-radius:9px;background:var(--glass-2);border:1px solid var(--stroke);
@@ -781,6 +784,52 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .hist-cat svg{width:15px;height:15px}
 .hist-n{flex:1;min-width:0;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist-o{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:750;color:#efe6ff}
+/* ---- Discord-style profile customizer (cards + right preview + modals) ---- */
+.studio3{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
+@media(max-width:940px){.studio3{grid-template-columns:1fr}}
+.pcust3{display:flex;flex-direction:column;gap:16px}
+.cust3{background:var(--glass);border:1px solid var(--stroke);border-radius:16px;padding:16px}
+.cust3-h{font-size:13px;font-weight:800;letter-spacing:.3px;color:var(--text-dim);margin-bottom:11px;text-transform:uppercase}
+.cthumb-row{display:flex;gap:12px}
+.cthumb{flex:1;display:flex;flex-direction:column;gap:9px;align-items:center;padding:12px;border-radius:13px;
+  background:var(--glass-2);border:1px solid var(--stroke);transition:.15s var(--ease)}
+.cthumb:hover{border-color:rgba(var(--accent-rgb),.6);transform:translateY(-2px)}
+.cthumb-img{width:76px;height:76px;border-radius:14px;background:center/contain no-repeat var(--bg-1);border:1px solid var(--stroke);display:grid;place-items:center}
+.cthumb-img.ph{background:repeating-conic-gradient(rgba(255,255,255,.05) 0% 25%,transparent 0% 50%) 0/14px 14px}
+.cthumb-l{font-size:12.5px;font-weight:700;color:var(--text)}
+.npcard{width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--stroke);transition:.15s var(--ease)}
+.npcard:hover{border-color:rgba(var(--accent-rgb),.6)}
+.npcard .np-preview{border:none;border-radius:0}
+.nscard{width:100%;padding:14px;border-radius:12px;background:var(--glass-2);border:1px solid var(--stroke);transition:.15s var(--ease)}
+.nscard:hover{border-color:rgba(var(--accent-rgb),.6)}
+.nscard-n{font-size:22px;font-weight:800;font-family:"Bricolage Grotesque",system-ui}
+/* right preview column — permanently sticky, no tucking */
+.ppcol2{position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:12px}
+.ppcol2 .ppreview{min-height:0}
+.np-side-h{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text-mute);margin-bottom:7px}
+.np-side .np-preview{height:48px}
+/* modal */
+.mdl-wrap{position:fixed;inset:0;z-index:300;display:grid;place-items:center;background:rgba(4,6,12,.72);backdrop-filter:blur(6px);padding:24px;animation:updIn .2s ease}
+.mdl{width:min(440px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--bg-1);border:1px solid var(--stroke);border-radius:20px;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.mdl.wide{width:min(640px,94vw)}
+.mdl-h{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 14px}
+.mdl-h h3{font-size:18px;font-weight:800;letter-spacing:-.3px}
+.mdl-x{width:34px;height:34px;border-radius:10px;color:var(--text-mute);display:grid;place-items:center}
+.mdl-x:hover{background:var(--glass-2);color:var(--text)}
+.mdl-b{padding:0 22px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.mdl-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;padding-top:14px;border-top:1px solid var(--stroke)}
+.mdl-foot .act{width:auto;padding:0 20px;height:40px;flex:none}
+.mdl-count{font-size:12px;color:var(--text-mute);font-weight:600}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:10px}
+.mtile{position:relative;aspect-ratio:1;border-radius:13px;overflow:hidden;border:2px solid var(--stroke);background:var(--glass-2)}
+.mtile.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(var(--accent-rgb),.35)}
+.mtile.none{display:grid;place-items:center;color:var(--text-mute)}.mtile.none.on{color:var(--accent)}
+.mtile-b{width:100%;height:100%;display:grid;place-items:center}
+.mtile-b img{width:100%;height:100%;object-fit:contain}
+.mtile-w{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:8px;display:grid;place-items:center;
+  background:rgba(5,6,13,.6);color:var(--text-mute);opacity:0;transition:.14s}
+.mtile:hover .mtile-w{opacity:1}
+.mtile-w.on{opacity:1;color:#ff5c8a}
 </style>
 </head>
 <body>
@@ -962,6 +1011,13 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.5',d:'15 Aug 2026',notes:[
+    'Your equipped profile frame now shows — on Home and in the studio (it was being read from the wrong place)',
+    'Profile page rebuilt to match Discord: click-to-change customizer cards on the left, a permanent live preview + nameplate on the right (no more popout floating over things)',
+    'The preview now shows your Discord username, pronouns and server tag, plus your connections',
+    'Add decorations & collectibles to a wishlist (♥) straight from the pickers',
+    'The studio now starts from what you actually have equipped',
+  ]},
   {v:'0.3.4',d:'15 Aug 2026',notes:[
     'The .exe file icon is now the Aurora logo (the resource compiler wasn\\u2019t being found before)',
     'Profile frames now inset correctly and wrap around the card — including looks saved before frames had geometry',
@@ -1122,8 +1178,35 @@ function dismissSplash(){ SET.splash_seen=true; byId('splash').classList.remove(
 window.setShop=function(list,err){ shopLoading=false; shopErr=err||null; SHOP=list||[]; if(NAV==='shop'||NAV==='profile') render(); };
 window.setOwned=function(list){ OWNED=list||[]; if((NAV==='shop'&&shopFilter==='owned')||NAV==='profile') render(); };
 window.setCatalog=function(list){ catLoading=false; CATALOG=list||[]; refreshFrameFromCatalog(); if(NAV==='profile') render(); };
-window.setStudio=function(s){ if(s&&typeof s==='object'){ Object.assign(STU,s); } if(NAV==='profile'){ render(); stuApply(); } };
-window.setEquipped=function(e){ EQUIPPED=e||null; if(NAV==='home'||NAV==='profile') render(); };
+window.setStudio=function(s){ if(s&&typeof s==='object'){ if(Array.isArray(s.wishlist)){ WISHLIST=s.wishlist; delete s.wishlist; } Object.assign(STU,s); } if(NAV==='profile'){ render(); stuApply(); } };
+window.setEquipped=function(e){ EQUIPPED=e||null; seedStudioFromEquipped(); if(NAV==='home'||NAV==='profile') render(); };
+// Start the studio from what you actually have equipped, filling only the fields
+// you haven't already customised (so a saved look still wins).
+function seedStudioFromEquipped(){
+  const e=EQUIPPED; if(!e) return;
+  if(e.decoration&&!STU.deco) STU.deco=e.decoration;
+  if(e.nameplate&&!STU.nameplate){ STU.nameplate=e.nameplate; STU.nameplateVideo=e.nameplateVideo||''; }
+  if(e.effectAnim&&e.effectAnim.length&&!STU.effectAnim) STU.effectAnim=e.effectAnim;
+  if(e.frameLayers&&e.frameLayers.length&&!(STU.frameLayers&&STU.frameLayers.length)){ STU.frameLayers=e.frameLayers; STU.frameMetrics=e.frameMetrics; STU.frame=STU.frame||'__equipped__'; }
+  if(e.banner&&!STU.banner) STU.banner=e.banner;
+  if(e.themeA&&!STU.themeA) STU.themeA=e.themeA;
+  if(e.themeB&&!STU.themeB) STU.themeB=e.themeB;
+}
+// The username · pronouns · server-tag line, and the connections list — from your
+// real Discord profile, shown on the preview like Discord does.
+function tagLine(){
+  const e=EQUIPPED||{};
+  const uname=esc(e.username||(USER&&USER.name?USER.name:'you'));
+  const bits=[uname]; if(e.pronouns) bits.push(esc(e.pronouns));
+  let tag=''; if(e.tag) tag=' <span class="pp-servertag">'+(e.tagIcon?'<img src="'+esc(e.tagIcon)+'">':'')+esc(e.tag)+'</span>';
+  return '<div class="pp-tag">'+bits.join(' · ')+tag+'</div>';
+}
+function connBlock(){
+  const conns=(EQUIPPED&&EQUIPPED.connections)||[];
+  if(!conns.length) return '';
+  const CI={twitch:'#9146ff',domain:'#5865f2',youtube:'#f00',steam:'#1b2838',spotify:'#1db954',github:'#333',reddit:'#ff4500'};
+  return '<div class="pp-sub">Connections</div>'+conns.slice(0,5).map(c=>'<div class="pp-conn"><span class="pp-conn-d" style="background:'+(CI[c.type]||'var(--glass-2)')+'"></span><span class="pp-conn-n">'+esc(c.name||'')+'</span><span class="pp-conn-t">'+esc(c.type||'')+'</span></div>').join('');
+}
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
 window.setVersion=function(v){ APP_VERSION=v||''; maybeChangelog(); };
 window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); };
@@ -1395,7 +1478,7 @@ let studioSaveT=0;
 function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,nameplateVideo:STU.nameplateVideo,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
   nameFont:STU.nameFont,nameEffect:STU.nameEffect,nameColor:STU.nameColor,themeA:STU.themeA,themeB:STU.themeB,open:STU.open,
   avBright:STU.avBright,avContrast:STU.avContrast,avSat:STU.avSat,avHue:STU.avHue,zoom:STU.zoom,
-  bnBright:STU.bnBright,bnContrast:STU.bnContrast,bnSat:STU.bnSat,bnHue:STU.bnHue}; }
+  bnBright:STU.bnBright,bnContrast:STU.bnContrast,bnSat:STU.bnSat,bnHue:STU.bnHue,wishlist:WISHLIST}; }
 function saveStudio(){ clearTimeout(studioSaveT); studioSaveT=setTimeout(()=>send('saveStudio',{data:studioBlob()}),400); }
 // Render a profile effect: animated APNG layers if available, else a static image.
 function fxRender(el,anim,img){
@@ -1564,13 +1647,13 @@ function equippedProfile(){
       +'<span class="pp-status"></span></div>'
     +'<div class="pp-body">'
       +'<div class="pp-name" style="'+nameSty+'">'+name+'</div>'
-      +'<div class="pp-tag">'+uname+(e.pronouns?' · <span>'+esc(e.pronouns)+'</span>':'')+'</div>'
+      +tagLine()
       +heroBadges()
       +'<div class="pp-btns"><span class="pp-btn wide">Message</span><span class="pp-btn">'+ICO.gift+'</span><span class="pp-btn">•••</span></div>'
       +'<div class="pp-details">'
-        +(e.bio?('<div class="pp-sub">About me</div><div class="pp-bio">'+esc(e.bio)+'</div>'):'')
+        +'<div class="pp-bio">'+(e.bio?esc(e.bio):'Describe yourself in three emoji')+'</div>'
         +'<div class="pp-sub">Member Since</div><div class="pp-val">'+since+'</div>'
-        +(conns?('<div class="pp-sub">Connections</div>'+conns):'')
+        +connBlock()
         +'<div class="pp-sub">Aurora Orbs</div><div class="pp-val"><span class="orb-dot"></span> '+orbs+' orbs</div>'
       +'</div>'
     +'</div></div>'+fFront+'</div>';
@@ -1593,12 +1676,13 @@ function profileCard(mode){
     +'<div class="pp-avwrap"><div class="pp-av" id="stAvatar">'+(STU.avatar?'':(USER&&USER.avatar?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>'))+'</div><div class="pp-deco" id="stDeco"></div><span class="pp-status"></span></div>'
     +'<div class="pp-body">'
       +'<div class="pp-name" id="stName">'+name+'</div>'
-      +'<div class="pp-tag">'+esc(handle)+' · <span>Aurora</span></div>'
+      +tagLine()
       +(badges||'')
       +'<div class="pp-btns"><span class="pp-btn wide">Message</span><span class="pp-btn">'+ICO.gift+'</span><span class="pp-btn">•••</span></div>'
       +'<div class="pp-details">'
-        +'<div class="pp-sub">About me</div><div class="pp-bio">'+(mode==='home'?'Playing Quests with Aurora ✦':'Write a brief intro…')+'</div>'
+        +'<div class="pp-bio">'+((EQUIPPED&&EQUIPPED.bio)?esc(EQUIPPED.bio):'Describe yourself in three emoji')+'</div>'
         +'<div class="pp-sub">Member Since</div><div class="pp-val">'+since+'</div>'
+        +connBlock()
         +'<div class="pp-sub">Aurora Orbs</div><div class="pp-val"><span class="orb-dot"></span> '+orbs+' orbs</div>'
       +'</div>'
       +(sticky?'<div class="pp-hint" id="ppHint">Live preview — edit on the left</div>':'')
@@ -1620,46 +1704,102 @@ function setupStickyPreview(){
   };
   c.addEventListener('scroll',c._ppScroll); c._ppScroll();
 }
+// A large square thumbnail button that opens a picker; shows the current pick.
+function cThumb(onclick,img,label,fallback){
+  const inner=img?'<span class="cthumb-img" style="background-image:url(\''+esc(img)+'\')"></span>':'<span class="cthumb-img ph">'+(fallback||'')+'</span>';
+  return '<button class="cthumb" onclick="'+onclick+'">'+inner+'<span class="cthumb-l">'+label+'</span></button>';
+}
+function customizerCards(){
+  const npBar=(STU.nameplate||STU.nameplateVideo)?nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo):'<div class="np-preview"><div class="np-row"><div class="np-av"><span>'+(((USER&&USER.name)||'Y').charAt(0).toUpperCase())+'</span></div><div class="np-name">'+esc((USER&&USER.name)||'You')+'</div></div></div>';
+  const nameSw=nameStyleSwatch();
+  const themeThumb=(STU.themeA||STU.themeB)?'<span class="cthumb-img" style="background:linear-gradient(160deg,'+(STU.themeA||'#2a2c38')+','+(STU.themeB||STU.themeA||'#14151c')+')"></span>':'<span class="cthumb-img ph"></span>';
+  return '<div class="cust3"><div class="cust3-h">Nameplate</div>'
+      +'<button class="npcard" onclick="openPick(\'nameplate\')">'+npBar+'</button></div>'
+    +'<div class="cust3"><div class="cust3-h">Avatar &amp; Decoration</div><div class="cthumb-row">'
+      +cThumb('openAvatar()',STU.avatar,'Avatar','<span class="mini ph"></span>')
+      +cThumb("openPick('deco')",STU.deco,'Decoration','')+'</div></div>'
+    +'<div class="cust3"><div class="cust3-h">Display Name Style</div>'
+      +'<button class="nscard" onclick="openNameStyle()"><span class="nscard-n" id="nsCardName">'+esc((USER&&USER.name)||'You')+'</span></button></div>'
+    +'<div class="cust3"><div class="cust3-h">Theme &amp; Banner</div><div class="cthumb-row">'
+      +'<button class="cthumb" onclick="openTheme()">'+themeThumb+'<span class="cthumb-l">Theme</span></button>'
+      +cThumb('openBanner()',STU.banner,'Banner','')+'</div></div>'
+    +'<div class="cust3"><div class="cust3-h">Profile Effect &amp; Frame</div><div class="cthumb-row">'
+      +cThumb("openPick('effect')",STU.effect,'Effect','')
+      +cThumb("openPick('frame')",STU.frame&&STU.frame!=='__equipped__'?STU.frame:'','Frame','')+'</div></div>';
+}
 function studioHtml(){
-  // ---- customizer (left): one dropdown per collectible type ----
-  const fonts='<div class="ff-l">Choose font</div><div class="fontgrid">'
-    +NFONTS.map(f=>'<button class="fontpick'+(STU.nameFont===f[0]?' on':'')+'" onclick="stuFont(\''+f[0]+'\')" style="font-family:'+f[1].replace(/"/g,'&quot;')+'">Gg</button>').join('')+'</div>';
-  const effs='<div class="ff-l">Choose effect</div><div class="effgrid">'
-    +NEFFECTS.map(e=>'<button class="effpick'+(STU.nameEffect===e[0]?' on':'')+'" onclick="stuEffect(\''+e[0]+'\')"><span id="efs_'+e[0]+'">'+e[1]+'</span></button>').join('')+'</div>';
-  const cols='<div class="ff-l">Choose colour</div><div class="colgrid">'
-    +NCOLORS.map((c,i)=>'<button class="colpick'+(STU.nameColor===i?' on':'')+'" onclick="stuColor('+i+')" style="background:linear-gradient(135deg,'+c[0]+','+c[1]+')"></button>').join('')+'</div>';
-  const themeDot=(STU.themeA||STU.themeB)?('<span class="mini" style="background:linear-gradient(135deg,'+(STU.themeA||'#555')+','+(STU.themeB||STU.themeA||'#555')+')"></span>'):'';
-  const themeSw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\')"></button>').join('')+'</div>';
-  const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\')" title="Clear">'+ICO.close+'</button>':'')+'</div>'; };
-  const cust=
-     stuSection('nameplate','Nameplate',swImg(STU.nameplate), nameplatePreview()+stuPicker('nameplate'))
-    +stuSection('avatar','Avatar',swImg(STU.avatar,'<span class="mini ph"></span>'),
-        '<div class="st-row"><button class="act ghost" onclick="stuUpload(\'avatar\')">⬆ Upload avatar</button></div>'
-        +stuSlider('avBright','Brightness',20,180,'%')+stuSlider('avContrast','Contrast',20,180,'%')
-        +stuSlider('avSat','Saturation',0,200,'%')+stuSlider('avHue','Hue',0,360,'°')+stuSlider('zoom','Zoom',100,300,'%')
-        +'<div class="hempty">Drag the avatar in the preview to reposition.</div>'
-        +'<div class="st-row"><button class="act primary" onclick="stuExport(\'avatar\')">Save avatar</button></div>')
-    +stuSection('decoration','Decoration',swImg(STU.deco,'<span class="mini ph"></span>'), stuPicker('deco'))
-    +stuSection('namestyle','Display Name Style',nameStyleSwatch(), fonts+effs+cols)
-    +stuSection('theme','Theme',themeDot,
-        '<div class="ff-l">Primary colour</div>'+colInput('A')+themeSw('A')
-        +'<div class="ff-l">Secondary colour</div>'+colInput('B')+themeSw('B')
-        +'<div class="hempty">Like Discord, the two colours tint your profile (the area under the banner) — not the banner itself. Use the picker for any colour.</div>')
-    +stuSection('banner','Banner',swImg(STU.banner),
-        '<div class="st-row"><button class="act ghost" onclick="stuUpload(\'banner\')">⬆ Upload banner</button></div>'
-        +stuSlider('bnBright','Brightness',20,180,'%')+stuSlider('bnContrast','Contrast',20,180,'%')
-        +stuSlider('bnSat','Saturation',0,200,'%')+stuSlider('bnHue','Hue',0,360,'°')
-        +'<div class="st-row"><button class="act primary" onclick="stuExport(\'banner\')">Save banner</button></div>')
-    +stuSection('effect','Profile Effect',swImg(STU.effect,''), stuPicker('effect'))
-    +stuSection('frame','Frame',swImg(STU.frame,''), stuPicker('frame'));
+  const preview='<div class="ppcol2"><div class="studio-preview">'+profileCard('studio')+'</div>'
+    +'<div class="np-side"><div class="np-side-h">Nameplate · member list</div>'
+    +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div></div>';
   return '<div class="hsec"><div class="hsec-head"><h3>Profile studio</h3>'
       +'<button class="viewall" onclick="stuReset()">Reset all</button></div>'
-    +'<div class="studio-top"><div class="studio-preview">'+profileCard('studio')+'</div></div>'
-    +'<div class="np-pop" id="npPop">'+nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div>'
-    +'<div class="hempty" style="margin:2px 0 14px">Preview every profile collectible — every decoration, nameplate, effect, frame, name style and theme, owned or not — on your own profile. Your look is remembered until you Reset. Export edited avatars &amp; banners (GIF supported).</div>'
-    +'<div class="pcust">'+cust+'</div></div>';
+    +'<div class="hempty" style="margin:2px 0 14px">Click any item to change it — the preview on the right updates live and stays with you as you scroll. Your look is remembered until you Reset.</div>'
+    +'<div class="studio3"><div class="pcust3">'+customizerCards()+'</div>'+preview+'</div></div>';
 }
 const THEMESW=['#5865f2','#b794f6','#34d399','#22d3ee','#f472b6','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#111827'];
+
+/* ---- modal customizer popups (Discord-style) ---- */
+function openModal(title,html,wide){
+  closeModal();
+  const w=document.createElement('div'); w.className='mdl-wrap'; w.id='mdlWrap';
+  w.onclick=e=>{ if(e.target===w) closeModal(); };
+  w.innerHTML='<div class="mdl'+(wide?' wide':'')+'"><div class="mdl-h"><h3>'+title+'</h3><button class="mdl-x" onclick="closeModal()">'+ICO.close+'</button></div><div class="mdl-b">'+html+'</div></div>';
+  document.body.appendChild(w);
+}
+function closeModal(){ const w=byId('mdlWrap'); if(w) w.remove(); }
+// A picker modal (decoration / nameplate / effect / frame): grid of everything,
+// with None, wishlist hearts, and live apply.
+function openPick(kind){
+  const TITLES2={deco:'Change Decoration',nameplate:'Change Nameplate',effect:'Change Profile Effect',frame:'Change Frame'};
+  openModal(TITLES2[kind]||'Change',pickGrid(kind),true);
+}
+function pickGrid(kind){
+  if(CATALOG===null){ if(!catLoading){catLoading=true;send('loadCatalog');} return '<div class="pp-load">Loading collectibles…</div>'; }
+  const items=(CATALOG||[]).filter(i=>i.kind===kind&&i.image);
+  const none='<button class="mtile none'+(STU[kind]?'':' on')+'" onclick="stuPick(\''+kind+'\',\'\');refreshPick(\''+kind+'\')" data-tip="None">'+ICO.close+'</button>';
+  const tiles=items.map(i=>{
+    const on=STU[kind]===i.image;
+    return '<div class="mtile'+(on?' on':'')+'" data-tip="'+esc(i.name)+(i.orbs?' · '+i.orbs+' orbs':' · not orb')+'">'
+      +'<button class="mtile-b" onclick="stuPick(\''+kind+'\',\''+esc(i.sku)+'\');refreshPick(\''+kind+'\')"><img src="'+esc(i.image)+'" loading="lazy" onerror="this.style.opacity=.12"></button>'
+      +'<button class="mtile-w'+(isWished(i.sku)?' on':'')+'" title="Wishlist" onclick="wishToggle(\''+esc(i.sku)+'\');refreshPick(\''+kind+'\')">'+ICO.heart+'</button></div>';
+  }).join('');
+  return '<div class="mgrid" id="mGrid">'+none+tiles+'</div>'
+    +'<div class="mdl-foot"><span class="mdl-count">'+items.length+' options · click the ♥ to wishlist</span><button class="act primary" onclick="closeModal()">Done</button></div>';
+}
+function refreshPick(kind){ const g=byId('mGrid'); if(g){ const wrap=byId('mdlWrap'); if(wrap) wrap.querySelector('.mdl-b').innerHTML=pickGrid(kind); } }
+function openNameStyle(){
+  const fonts='<div class="ff-l">Font</div><div class="fontgrid">'+NFONTS.map(f=>'<button class="fontpick'+(STU.nameFont===f[0]?' on':'')+'" onclick="stuFont(\''+f[0]+'\');reopenNameStyle()" style="font-family:'+f[1].replace(/"/g,'&quot;')+'">Gg</button>').join('')+'</div>';
+  const effs='<div class="ff-l">Effect</div><div class="effgrid">'+NEFFECTS.map(e=>'<button class="effpick'+(STU.nameEffect===e[0]?' on':'')+'" onclick="stuEffect(\''+e[0]+'\');reopenNameStyle()"><span id="efs_'+e[0]+'">'+e[1]+'</span></button>').join('')+'</div>';
+  const cols='<div class="ff-l">Colour</div><div class="colgrid">'+NCOLORS.map((c,i)=>'<button class="colpick'+(STU.nameColor===i?' on':'')+'" onclick="stuColor('+i+');reopenNameStyle()" style="background:linear-gradient(135deg,'+c[0]+','+c[1]+')"></button>').join('')+'</div>';
+  openModal('Change Display Name Style',fonts+effs+cols+'<div class="mdl-foot"><span class="mdl-count"></span><button class="act primary" onclick="closeModal()">Done</button></div>');
+  decorateNameTiles();
+}
+function reopenNameStyle(){ openNameStyle(); }
+function openTheme(){
+  const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\');openTheme()">'+ICO.close+'</button>':'')+'</div>'; };
+  const sw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\');openTheme()"></button>').join('')+'</div>';
+  openModal('Change Theme','<div class="ff-l">Primary colour</div>'+colInput('A')+sw('A')
+    +'<div class="ff-l">Secondary colour</div>'+colInput('B')+sw('B')
+    +'<div class="hempty">Two colours tint your profile (under the banner), like Discord — pick any colour.</div>'
+    +'<div class="mdl-foot"><span class="mdl-count"></span><button class="act primary" onclick="closeModal()">Done</button></div>');
+}
+function openBanner(){
+  openModal('Change Banner','<div class="st-row"><button class="act ghost" onclick="stuUpload(\'banner\')">⬆ Upload banner</button></div>'
+    +stuSlider('bnBright','Brightness',20,180,'%')+stuSlider('bnContrast','Contrast',20,180,'%')
+    +stuSlider('bnSat','Saturation',0,200,'%')+stuSlider('bnHue','Hue',0,360,'°')
+    +'<div class="mdl-foot"><button class="act ghost" onclick="stuExport(\'banner\')">Save to PC</button><button class="act primary" onclick="closeModal()">Done</button></div>');
+}
+function openAvatar(){
+  openModal('Change Avatar','<div class="st-row"><button class="act ghost" onclick="stuUpload(\'avatar\')">⬆ Upload avatar</button></div>'
+    +stuSlider('avBright','Brightness',20,180,'%')+stuSlider('avContrast','Contrast',20,180,'%')
+    +stuSlider('avSat','Saturation',0,200,'%')+stuSlider('avHue','Hue',0,360,'°')+stuSlider('zoom','Zoom',100,300,'%')
+    +'<div class="hempty">Drag the avatar in the preview to reposition.</div>'
+    +'<div class="mdl-foot"><button class="act ghost" onclick="stuExport(\'avatar\')">Save to PC</button><button class="act primary" onclick="closeModal()">Done</button></div>');
+}
+/* wishlist (kept locally, persisted with your look) */
+let WISHLIST=[];
+function isWished(sku){ return WISHLIST.indexOf(sku)>=0; }
+function wishToggle(sku){ const i=WISHLIST.indexOf(sku); if(i>=0){WISHLIST.splice(i,1);toast('Removed from wishlist');} else {WISHLIST.push(sku);toast('Added to wishlist');} saveStudio(); }
 
 /* ====================== stats + profile ====================== */
 function fmtTime(sec){ const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60); return h>0?h+'h '+m+'m':m+'m'; }
@@ -1807,7 +1947,8 @@ const ICO={
   empty:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/></svg>',
   party:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.5-11 6.5 6.5z"/><path d="M15 4.5v.01M19.5 9v.01M18 3l1.6 1.6M20.5 13.5h.01"/></svg>',
   refresh:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4.5V10H15"/></svg>',
-  close:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+  close:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  heart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5l-1.5-1.35C5.4 14.6 2.5 12 2.5 8.75 2.5 6.4 4.4 4.5 6.75 4.5c1.4 0 2.75.66 3.6 1.7l.65.8.65-.8A4.7 4.7 0 0117.25 4.5c2.35 0 4.25 1.9 4.25 4.25 0 3.25-2.9 5.85-8 10.4z"/></svg>'
 };
 
 function counts(){
@@ -1824,7 +1965,7 @@ function render(){
   if(NAV==='shop'){ c.innerHTML=shopHtml(); return; }
   if(NAV==='badges'){ c.innerHTML=badgesHtml(); return; }
   if(NAV==='history'){ c.innerHTML=historyHtml(); return; }
-  if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); setupStickyPreview(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
+  if(NAV==='profile'){ c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); if(CATALOG===null&&!catLoading){ catLoading=true; send('loadCatalog'); } return; }
   if(NAV==='home'){ c.innerHTML=homeHtml(); if(SHOP===null&&!shopLoading){ shopLoading=true; send('loadShop'); } return; }
   if(!GOT) return;
   const list=visible();
