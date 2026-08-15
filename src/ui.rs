@@ -490,6 +490,12 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .home-welcome .hi{color:var(--text-dim);font-size:13px;font-weight:600}
 .home-welcome .hname{font-size:24px;font-weight:800;letter-spacing:-.4px;margin:2px 0 8px;
   font-family:"Bricolage Grotesque","Segoe UI Variable Display",system-ui}
+.home-welcome .hw-orbs{display:flex;align-items:center;gap:9px;font-size:27px;font-weight:800;letter-spacing:-.6px;margin:3px 0 12px;
+  font-family:"Bricolage Grotesque",system-ui}
+.home-welcome .hw-orbs small{font-size:15px;font-weight:650;color:var(--text-dim);letter-spacing:0}
+.home-welcome .hw-orbs .orb-dot{width:18px;height:18px}
+.home-welcome .earnable{font-size:12.5px;margin-left:4px}
+.home-welcome .np-preview{height:44px}
 .home-cta{display:flex;gap:10px;align-items:center}
 .home-cta .act{flex:1;height:46px;padding:0 14px}
 .home-cta .hicon{flex:none;width:46px;height:46px}
@@ -591,6 +597,11 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .np-av img{width:100%;height:100%;object-fit:cover}
 .np-av span{font-size:12px;font-weight:800;color:var(--accent)}
 .np-name{font-size:14.5px;font-weight:650;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55)}
+/* nameplate popout under the tucked profile preview */
+.np-pop{position:fixed;display:none;right:24px;width:292px;z-index:60;border-radius:12px;overflow:hidden;
+  border:1px solid rgba(var(--accent-rgb),.45);box-shadow:0 20px 50px -14px rgba(0,0,0,.7)}
+.np-pop .np-preview{height:52px;border:none;border-radius:12px}
+.np-pop .np-name{font-size:15px}
 .mini.nsw{width:auto;padding:0 7px;font-size:13px;font-weight:900;line-height:22px;background:var(--glass-2)}
 /* display-name-style pickers (font / effect / colour) */
 .fontgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
@@ -951,6 +962,12 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.4',d:'15 Aug 2026',notes:[
+    'The .exe file icon is now the Aurora logo (the resource compiler wasn\\u2019t being found before)',
+    'Profile frames now inset correctly and wrap around the card — including looks saved before frames had geometry',
+    'Home "Welcome back" now leads with your orb count and your animated equipped nameplate',
+    'The nameplate pops out under the profile preview when you scroll',
+  ]},
   {v:'0.3.3',d:'15 Aug 2026',notes:[
     'Real tier icons for the four evolving badges — all 10 tiers of Account Age, Streaming, Game Diversity & Game Depth',
     'Renamed Game Time → Game Depth and Game Variety → Game Diversity to match Discord',
@@ -1104,7 +1121,7 @@ function maybeSplash(){ }
 function dismissSplash(){ SET.splash_seen=true; byId('splash').classList.remove('show'); send('setSetting',{key:'splash_seen',value:true}); }
 window.setShop=function(list,err){ shopLoading=false; shopErr=err||null; SHOP=list||[]; if(NAV==='shop'||NAV==='profile') render(); };
 window.setOwned=function(list){ OWNED=list||[]; if((NAV==='shop'&&shopFilter==='owned')||NAV==='profile') render(); };
-window.setCatalog=function(list){ catLoading=false; CATALOG=list||[]; if(NAV==='profile') render(); };
+window.setCatalog=function(list){ catLoading=false; CATALOG=list||[]; refreshFrameFromCatalog(); if(NAV==='profile') render(); };
 window.setStudio=function(s){ if(s&&typeof s==='object'){ Object.assign(STU,s); } if(NAV==='profile'){ render(); stuApply(); } };
 window.setEquipped=function(e){ EQUIPPED=e||null; if(NAV==='home'||NAV==='profile') render(); };
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
@@ -1394,7 +1411,16 @@ function fxRender(el,anim,img){
 // Inset the card into the frame's window: the frame extends past the profile by
 // overflow_top/bottom/horizontal (as a fraction of its full width), so we margin
 // the card in by exactly those amounts and let the frame fill the wrapper around.
-function frameMargin(fm){ if(!fm) return ''; const w=(fm.iw||0)+2*(fm.oh||0); if(w<=0) return ''; return 'margin:'+(fm.ot/w*100).toFixed(3)+'% '+(fm.oh/w*100).toFixed(3)+'% '+(fm.ob/w*100).toFixed(3)+'%'; }
+// Typical Discord frame geometry, used when a saved look predates frame metrics.
+const DEFAULT_FRAME_METRICS={iw:1200,ot:300,ob:150,oh:55};
+function frameMargin(fm){ fm=fm||DEFAULT_FRAME_METRICS; const w=(fm.iw||0)+2*(fm.oh||0); if(w<=0) return ''; return 'margin:'+(fm.ot/w*100).toFixed(3)+'% '+(fm.oh/w*100).toFixed(3)+'% '+(fm.ob/w*100).toFixed(3)+'%'; }
+// Re-derive a selected frame's layers + geometry from the catalog (fixes saved
+// looks that stored layers before frame metrics existed).
+function refreshFrameFromCatalog(){
+  if(!STU.frame||!CATALOG) return;
+  const it=(CATALOG||[]).find(i=>i.kind==='frame'&&i.image===STU.frame);
+  if(it){ if(it.layers) STU.frameLayers=it.layers; if(it.metrics) STU.frameMetrics=it.metrics; }
+}
 // Static frame layer HTML (for the read-only equipped card).
 function frameHtml(cls,layers){ if(!layers||!layers.length) return ''; return '<div class="pp-frame '+cls+'">'+layers.map(l=>'<img class="fl fl-'+esc(l.anchor)+'" src="'+esc(l.url)+'">').join('')+'</div>'; }
 function frameRender(layers){
@@ -1495,16 +1521,19 @@ function stuSection(id,title,swatchHtml,body){
     +(open?'<div class="cust-b">'+body+'</div>':'')+'</div>';
 }
 function swImg(url,fallback){ return url?'<span class="mini" style="background-image:url(\''+esc(url)+'\')"></span>':(fallback||''); }
-// Nameplates aren't shown on the profile — they sit behind your name in the
-// member list / DM list. Preview them there, animated (webm) when available.
-function nameplatePreview(){
-  const name=esc((USER&&USER.name)||'You');
-  const av=(USER&&USER.avatar)?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>';
+// A member-list-style row: avatar + name over the nameplate art (animated when a
+// webm is available). Nameplates never show on the profile — this is where they go.
+function nameplateRow(name,avatar,npStatic,npVideo){
+  name=name||'You';
+  const av=avatar?'<img src="'+esc(avatar)+'">':'<span>'+esc(name.charAt(0).toUpperCase())+'</span>';
   let bg='';
-  if(STU.nameplateVideo) bg='<video class="np-bg" autoplay loop muted playsinline poster="'+esc(STU.nameplate)+'" src="'+esc(STU.nameplateVideo)+'"></video>';
-  else if(STU.nameplate) bg='<img class="np-bg" src="'+esc(STU.nameplate)+'">';
+  if(npVideo) bg='<video class="np-bg" autoplay loop muted playsinline poster="'+esc(npStatic||'')+'" src="'+esc(npVideo)+'"></video>';
+  else if(npStatic) bg='<img class="np-bg" src="'+esc(npStatic)+'">';
+  return '<div class="np-preview">'+bg+'<div class="np-row"><div class="np-av">'+av+'</div><div class="np-name">'+esc(name)+'</div></div></div>';
+}
+function nameplatePreview(){
   return '<div class="ff-l">How it looks in the member list</div>'
-    +'<div class="np-preview">'+bg+'<div class="np-row"><div class="np-av">'+av+'</div><div class="np-name">'+name+'</div></div></div>'
+    +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)
     +'<div class="hempty" style="margin:2px 0 4px">Nameplates show behind your name in the member list &amp; DMs — not on your profile.</div>';
 }
 function nameStyleSwatch(){ const cc=NCOLORS[STU.nameColor||0]||NCOLORS[0]; return '<span class="mini nsw" style="background:linear-gradient(135deg,'+cc[0]+','+cc[1]+');-webkit-background-clip:text;background-clip:text;color:transparent;font-family:'+fontStack(STU.nameFont).replace(/"/g,'&quot;')+'">Aa</span>'; }
@@ -1527,7 +1556,7 @@ function equippedProfile(){
   const fl=e.frameLayers||[];
   const fBack=frameHtml('back',fl.filter(l=>l.order!=='front')), fFront=frameHtml('front',fl.filter(l=>l.order==='front'));
   return '<div class="pp-wrap">'+fBack
-    +'<div class="ppreview pp-static" style="--pt:'+esc(pt)+';--pt2:'+esc(pt2)+';'+frameMargin(e.frameMetrics)+'">'
+    +'<div class="ppreview pp-static" style="--pt:'+esc(pt)+';--pt2:'+esc(pt2)+';'+((fl&&fl.length)?frameMargin(e.frameMetrics):'')+'">'
     +fx
     +'<div class="pp-banner" style="'+bstyle+'"></div>'
     +'<div class="pp-avwrap"><div class="pp-av">'+(av?'<img src="'+esc(av)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>')+'</div>'
@@ -1558,7 +1587,7 @@ function profileCard(mode){
   const tA=STU.themeA||'#232428', tB=STU.themeB||STU.themeA||'#232428';
   return '<div class="pp-wrap" id="ppWrap">'
     +'<div class="pp-frame back" id="stFrameBack"></div>'
-    +'<div class="ppreview'+(sticky?' pp-sticky':' pp-static')+'" id="ppreview" style="--pt:'+tA+';--pt2:'+tB+';'+frameMargin(STU.frameMetrics)+'" onclick="ppClick()">'
+    +'<div class="ppreview'+(sticky?' pp-sticky':' pp-static')+'" id="ppreview" style="--pt:'+tA+';--pt2:'+tB+';'+((STU.frameLayers&&STU.frameLayers.length)?frameMargin(STU.frameMetrics):'')+'" onclick="ppClick()">'
     +'<div class="pp-effect" id="stEffect"></div>'
     +'<div class="pp-banner" id="stBanner"></div>'
     +'<div class="pp-avwrap"><div class="pp-av" id="stAvatar">'+(STU.avatar?'':(USER&&USER.avatar?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>'))+'</div><div class="pp-deco" id="stDeco"></div><span class="pp-status"></span></div>'
@@ -1584,7 +1613,10 @@ function setupStickyPreview(){
   c._ppScroll=function(){
     const pv=byId('ppreview');
     if(!pv||!pv.classList.contains('pp-sticky')) return;
-    pv.classList.toggle('tucked',c.scrollTop>200);
+    const tuck=c.scrollTop>200;
+    pv.classList.toggle('tucked',tuck);
+    const np=byId('npPop');
+    if(np){ if(tuck&&STU.nameplate){ const r=pv.getBoundingClientRect(); np.style.display='block'; np.style.top=(r.bottom+8)+'px'; } else { np.style.display='none'; } }
   };
   c.addEventListener('scroll',c._ppScroll); c._ppScroll();
 }
@@ -1623,6 +1655,7 @@ function studioHtml(){
   return '<div class="hsec"><div class="hsec-head"><h3>Profile studio</h3>'
       +'<button class="viewall" onclick="stuReset()">Reset all</button></div>'
     +'<div class="studio-top"><div class="studio-preview">'+profileCard('studio')+'</div></div>'
+    +'<div class="np-pop" id="npPop">'+nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div>'
     +'<div class="hempty" style="margin:2px 0 14px">Preview every profile collectible — every decoration, nameplate, effect, frame, name style and theme, owned or not — on your own profile. Your look is remembered until you Reset. Export edited avatars &amp; banners (GIF supported).</div>'
     +'<div class="pcust">'+cust+'</div></div>';
 }
@@ -1742,10 +1775,12 @@ function homeHtml(){
   const earnable=QUESTS.filter(q=>!q.completed&&!q.claimed&&!q.expired).reduce((s,q)=>s+(q.premiumOrbs||q.orbs||0),0);
   const sec=(title,nav,inner)=> '<div class="hsec"><div class="hsec-head"><h3>'+title+'</h3><button class="viewall" onclick="setNav(\''+nav+'\')">View all</button></div>'+inner+'</div>';
   const qgrid=(arr,empty)=> arr.length?'<div class="grid home2">'+arr.map(card).join('')+'</div>':'<div class="hempty">'+empty+'</div>';
+  const eqNp=EQUIPPED||{};
   const side='<div class="home-side">'
-    +'<div class="home-welcome"><div class="hi">Welcome back</div><div class="hname">'+esc(name)+'</div>'
-      +'<div class="horbs"><span class="orb-dot"></span>'+orbs+' orbs'
-      +(earnable>0?'<span class="earnable" data-tip="Total orbs from your unclaimed quests">+'+earnable.toLocaleString()+' earnable</span>':'')+'</div></div>'
+    +'<div class="home-welcome"><div class="hi">Welcome back</div>'
+      +'<div class="hw-orbs"><span class="orb-dot"></span>'+orbs+' <small>orbs</small>'
+      +(earnable>0?'<span class="earnable" data-tip="Total orbs from your unclaimed quests">+'+earnable.toLocaleString()+' earnable</span>':'')+'</div>'
+      +nameplateRow((eqNp.name)||name,(eqNp.avatar)||(USER&&USER.avatar),eqNp.nameplate,eqNp.nameplateVideo)+'</div>'
     +'<div class="home-cta"><button class="act primary" onclick="watchAll()">'+ICO.play+'Watch all</button>'
       +'<button class="act play" onclick="playAll()">'+ICO.play+'Play all</button>'
       +'<button class="iconbtn hicon" title="Refresh" onclick="rescan()">'+ICO.refresh+'</button></div>'

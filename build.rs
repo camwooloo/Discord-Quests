@@ -24,10 +24,42 @@ fn embed_icon() {
             if dir.write(file).is_ok() {
                 let mut res = winresource::WindowsResource::new();
                 res.set_icon(ico_path.to_str().unwrap());
-                let _ = res.compile(); // best-effort; ignore if rc tooling is absent
+                // winresource can't always locate the SDK's rc.exe on its own — point
+                // it at the newest one we can find so the .exe file icon gets embedded.
+                if let Some(rc_dir) = find_rc_dir() {
+                    res.set_toolkit_path(&rc_dir);
+                }
+                match res.compile() {
+                    Ok(_) => println!("cargo:warning=Aurora: embedded exe icon from logo.png"),
+                    Err(e) => println!("cargo:warning=Aurora: exe icon embed failed: {e}"),
+                }
             }
         }
     }
+}
+
+/// Newest `…\Windows Kits\10\bin\<ver>\x64` directory that contains rc.exe.
+#[cfg(windows)]
+fn find_rc_dir() -> Option<String> {
+    for root in [
+        r"C:\Program Files (x86)\Windows Kits\10\bin",
+        r"C:\Program Files\Windows Kits\10\bin",
+    ] {
+        let mut versions: Vec<_> = std::fs::read_dir(root)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .collect();
+        versions.sort();
+        for v in versions.into_iter().rev() {
+            let dir = v.join("x64");
+            if dir.join("rc.exe").exists() {
+                return dir.to_str().map(str::to_string);
+            }
+        }
+    }
+    None
 }
 
 /// Decode src/logo.png to RGBA (expanding RGB to RGBA if needed).
