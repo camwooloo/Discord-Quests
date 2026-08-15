@@ -661,6 +661,9 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .pp-frame .fl{position:absolute;left:0;width:100%;height:auto}
 .pp-frame .fl-top{top:0}
 .pp-frame .fl-bottom{bottom:0}
+/* the "center" layer is the side border — stretch it to the full card height so
+   the frame wraps regardless of how tall the profile is */
+.pp-frame .fl-center{top:0;bottom:0;height:100%}
 .pp-avwrap{position:relative;width:92px;height:92px;margin:-46px 0 0 22px;z-index:5}
 .pp-av{width:92px;height:92px;border-radius:50%;border:6px solid #232428;background:#111 center/cover no-repeat;cursor:grab;overflow:hidden;display:grid;place-items:center}
 .pp-av:active{cursor:grabbing}
@@ -784,7 +787,15 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .hist-cat svg{width:15px;height:15px}
 .hist-n{flex:1;min-width:0;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist-o{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:750;color:#efe6ff}
-/* ---- Discord-style profile customizer (cards + right preview + modals) ---- */
+/* ---- Discord-style profile customizer (cards + locked right preview) ---- */
+.prof2col{display:grid;grid-template-columns:1fr 360px;gap:26px;align-items:start}
+@media(max-width:940px){.prof2col{grid-template-columns:1fr}}
+.prof-left{min-width:0}
+.prof-right{position:sticky;top:14px;align-self:start;display:flex;flex-direction:column;gap:12px}
+.panel-back{display:flex;align-items:center;gap:8px;margin:0 0 14px;color:var(--text);font-size:15px;font-weight:750;
+  padding:8px 12px 8px 8px;border-radius:11px;transition:.15s var(--ease)}
+.panel-back:hover{background:var(--glass)}
+.panel-back svg{color:var(--text-mute)}
 .studio3{display:grid;grid-template-columns:1fr 380px;gap:24px;align-items:start}
 @media(max-width:940px){.studio3{grid-template-columns:1fr}}
 .pcust3{display:flex;flex-direction:column;gap:16px}
@@ -1011,6 +1022,11 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.6',d:'15 Aug 2026',notes:[
+    'Equipped profile frame now shows on Home and the preview, wrapping correctly (its side-border layer wasn\\u2019t being stretched to the card height)',
+    'Changing an item now opens in-place on the left, so the live preview + nameplate stay locked on the right — no popup covering things',
+    'The preview and nameplate are locked in position and no longer scroll away',
+  ]},
   {v:'0.3.5',d:'15 Aug 2026',notes:[
     'Your equipped profile frame now shows — on Home and in the studio (it was being read from the wrong place)',
     'Profile page rebuilt to match Discord: click-to-change customizer cards on the left, a permanent live preview + nameplate on the right (no more popout floating over things)',
@@ -1292,7 +1308,7 @@ function onCompleted(q){
 /* ====================== nav / filters ====================== */
 const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',profile:'Your Profile',settings:'Settings'};
 function setNav(n){
-  NAV=n; byId('pageTitle').textContent=TITLES[n];
+  NAV=n; custView=null; byId('pageTitle').textContent=TITLES[n];
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===n));
   byId('railAvatar').classList.toggle('active',n==='profile');
   byId('toolbar').style.display=(['settings','shop','home','badges','profile'].includes(n))?'none':'flex';
@@ -1727,79 +1743,66 @@ function customizerCards(){
       +cThumb("openPick('effect')",STU.effect,'Effect','')
       +cThumb("openPick('frame')",STU.frame&&STU.frame!=='__equipped__'?STU.frame:'','Frame','')+'</div></div>';
 }
+// The left customizer — either the cards, or an in-place panel for the item
+// you're changing (so the right-hand preview stays perfectly visible).
 function studioHtml(){
-  const preview='<div class="ppcol2"><div class="studio-preview">'+profileCard('studio')+'</div>'
-    +'<div class="np-side"><div class="np-side-h">Nameplate · member list</div>'
-    +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div></div>';
-  return '<div class="hsec"><div class="hsec-head"><h3>Profile studio</h3>'
-      +'<button class="viewall" onclick="stuReset()">Reset all</button></div>'
-    +'<div class="hempty" style="margin:2px 0 14px">Click any item to change it — the preview on the right updates live and stays with you as you scroll. Your look is remembered until you Reset.</div>'
-    +'<div class="studio3"><div class="pcust3">'+customizerCards()+'</div>'+preview+'</div></div>';
+  return '<div class="hsec-head" style="margin-bottom:12px"><h3>Profile studio</h3>'
+      +(custView?'':'<button class="viewall" onclick="stuReset()">Reset all</button>')+'</div>'
+    +(custView?panelHtml(custView)
+      :('<div class="hempty" style="margin:2px 0 14px">Click any item to change it — the preview stays locked on the right.</div>'+customizerCards()));
 }
 const THEMESW=['#5865f2','#b794f6','#34d399','#22d3ee','#f472b6','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#111827'];
 
-/* ---- modal customizer popups (Discord-style) ---- */
-function openModal(title,html,wide){
-  closeModal();
-  const w=document.createElement('div'); w.className='mdl-wrap'; w.id='mdlWrap';
-  w.onclick=e=>{ if(e.target===w) closeModal(); };
-  w.innerHTML='<div class="mdl'+(wide?' wide':'')+'"><div class="mdl-h"><h3>'+title+'</h3><button class="mdl-x" onclick="closeModal()">'+ICO.close+'</button></div><div class="mdl-b">'+html+'</div></div>';
-  document.body.appendChild(w);
-}
-function closeModal(){ const w=byId('mdlWrap'); if(w) w.remove(); }
-// A picker modal (decoration / nameplate / effect / frame): grid of everything,
-// with None, wishlist hearts, and live apply.
-function openPick(kind){
-  const TITLES2={deco:'Change Decoration',nameplate:'Change Nameplate',effect:'Change Profile Effect',frame:'Change Frame'};
-  openModal(TITLES2[kind]||'Change',pickGrid(kind),true);
+/* ---- in-place customizer panels (open on the left, preview stays put) ---- */
+let custView=null;
+function custBack(){ custView=null; render(); }
+function openPick(kind){ custView={t:'pick',kind:kind}; render(); if(CATALOG===null&&!catLoading){catLoading=true;send('loadCatalog');} }
+function openNameStyle(){ custView={t:'namestyle'}; render(); }
+function openTheme(){ custView={t:'theme'}; render(); }
+function openBanner(){ custView={t:'banner'}; render(); }
+function openAvatar(){ custView={t:'avatar'}; render(); }
+function panelHead(title){ return '<button class="panel-back" onclick="custBack()">'+ICO.back+'<span>'+esc(title)+'</span></button>'; }
+function panelHtml(v){
+  if(v.t==='pick'){ const T={deco:'Decoration',nameplate:'Nameplate',effect:'Profile Effect',frame:'Frame'};
+    return panelHead('Change '+(T[v.kind]||''))+pickGrid(v.kind); }
+  if(v.t==='namestyle'){
+    const fonts='<div class="ff-l">Font</div><div class="fontgrid">'+NFONTS.map(f=>'<button class="fontpick'+(STU.nameFont===f[0]?' on':'')+'" onclick="stuFont(\''+f[0]+'\')" style="font-family:'+f[1].replace(/"/g,'&quot;')+'">Gg</button>').join('')+'</div>';
+    const effs='<div class="ff-l">Effect</div><div class="effgrid">'+NEFFECTS.map(e=>'<button class="effpick'+(STU.nameEffect===e[0]?' on':'')+'" onclick="stuEffect(\''+e[0]+'\')"><span id="efs_'+e[0]+'">'+e[1]+'</span></button>').join('')+'</div>';
+    const cols='<div class="ff-l">Colour</div><div class="colgrid">'+NCOLORS.map((c,i)=>'<button class="colpick'+(STU.nameColor===i?' on':'')+'" onclick="stuColor('+i+')" style="background:linear-gradient(135deg,'+c[0]+','+c[1]+')"></button>').join('')+'</div>';
+    return panelHead('Change Display Name Style')+fonts+effs+cols; }
+  if(v.t==='theme'){
+    const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\')">'+ICO.close+'</button>':'')+'</div>'; };
+    const sw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\')"></button>').join('')+'</div>';
+    return panelHead('Change Theme')+'<div class="ff-l">Primary colour</div>'+colInput('A')+sw('A')
+      +'<div class="ff-l">Secondary colour</div>'+colInput('B')+sw('B')
+      +'<div class="hempty">Two colours tint your profile (under the banner), like Discord — pick any colour.</div>'; }
+  if(v.t==='banner'){
+    return panelHead('Change Banner')+'<div class="st-row"><button class="act ghost" onclick="stuUpload(\'banner\')">⬆ Upload banner</button><button class="act ghost" onclick="stuExport(\'banner\')">Save to PC</button></div>'
+      +stuSlider('bnBright','Brightness',20,180,'%')+stuSlider('bnContrast','Contrast',20,180,'%')
+      +stuSlider('bnSat','Saturation',0,200,'%')+stuSlider('bnHue','Hue',0,360,'°'); }
+  if(v.t==='avatar'){
+    return panelHead('Change Avatar')+'<div class="st-row"><button class="act ghost" onclick="stuUpload(\'avatar\')">⬆ Upload avatar</button><button class="act ghost" onclick="stuExport(\'avatar\')">Save to PC</button></div>'
+      +stuSlider('avBright','Brightness',20,180,'%')+stuSlider('avContrast','Contrast',20,180,'%')
+      +stuSlider('avSat','Saturation',0,200,'%')+stuSlider('avHue','Hue',0,360,'°')+stuSlider('zoom','Zoom',100,300,'%')
+      +'<div class="hempty">Drag the avatar in the preview to reposition.</div>'; }
+  return '';
 }
 function pickGrid(kind){
-  if(CATALOG===null){ if(!catLoading){catLoading=true;send('loadCatalog');} return '<div class="pp-load">Loading collectibles…</div>'; }
+  if(CATALOG===null) return '<div class="pp-load">Loading collectibles…</div>';
   const items=(CATALOG||[]).filter(i=>i.kind===kind&&i.image);
-  const none='<button class="mtile none'+(STU[kind]?'':' on')+'" onclick="stuPick(\''+kind+'\',\'\');refreshPick(\''+kind+'\')" data-tip="None">'+ICO.close+'</button>';
+  const none='<button class="mtile none'+(STU[kind]?'':' on')+'" onclick="stuPick(\''+kind+'\',\'\')" data-tip="None">'+ICO.close+'</button>';
   const tiles=items.map(i=>{
     const on=STU[kind]===i.image;
     return '<div class="mtile'+(on?' on':'')+'" data-tip="'+esc(i.name)+(i.orbs?' · '+i.orbs+' orbs':' · not orb')+'">'
-      +'<button class="mtile-b" onclick="stuPick(\''+kind+'\',\''+esc(i.sku)+'\');refreshPick(\''+kind+'\')"><img src="'+esc(i.image)+'" loading="lazy" onerror="this.style.opacity=.12"></button>'
-      +'<button class="mtile-w'+(isWished(i.sku)?' on':'')+'" title="Wishlist" onclick="wishToggle(\''+esc(i.sku)+'\');refreshPick(\''+kind+'\')">'+ICO.heart+'</button></div>';
+      +'<button class="mtile-b" onclick="stuPick(\''+kind+'\',\''+esc(i.sku)+'\')"><img src="'+esc(i.image)+'" loading="lazy" onerror="this.style.opacity=.12"></button>'
+      +'<button class="mtile-w'+(isWished(i.sku)?' on':'')+'" title="Wishlist" onclick="wishToggle(\''+esc(i.sku)+'\')">'+ICO.heart+'</button></div>';
   }).join('');
-  return '<div class="mgrid" id="mGrid">'+none+tiles+'</div>'
-    +'<div class="mdl-foot"><span class="mdl-count">'+items.length+' options · click the ♥ to wishlist</span><button class="act primary" onclick="closeModal()">Done</button></div>';
+  return '<div class="mdl-count" style="margin:2px 0 9px">'+items.length+' options · tap ♥ to wishlist</div><div class="mgrid">'+none+tiles+'</div>';
 }
-function refreshPick(kind){ const g=byId('mGrid'); if(g){ const wrap=byId('mdlWrap'); if(wrap) wrap.querySelector('.mdl-b').innerHTML=pickGrid(kind); } }
-function openNameStyle(){
-  const fonts='<div class="ff-l">Font</div><div class="fontgrid">'+NFONTS.map(f=>'<button class="fontpick'+(STU.nameFont===f[0]?' on':'')+'" onclick="stuFont(\''+f[0]+'\');reopenNameStyle()" style="font-family:'+f[1].replace(/"/g,'&quot;')+'">Gg</button>').join('')+'</div>';
-  const effs='<div class="ff-l">Effect</div><div class="effgrid">'+NEFFECTS.map(e=>'<button class="effpick'+(STU.nameEffect===e[0]?' on':'')+'" onclick="stuEffect(\''+e[0]+'\');reopenNameStyle()"><span id="efs_'+e[0]+'">'+e[1]+'</span></button>').join('')+'</div>';
-  const cols='<div class="ff-l">Colour</div><div class="colgrid">'+NCOLORS.map((c,i)=>'<button class="colpick'+(STU.nameColor===i?' on':'')+'" onclick="stuColor('+i+');reopenNameStyle()" style="background:linear-gradient(135deg,'+c[0]+','+c[1]+')"></button>').join('')+'</div>';
-  openModal('Change Display Name Style',fonts+effs+cols+'<div class="mdl-foot"><span class="mdl-count"></span><button class="act primary" onclick="closeModal()">Done</button></div>');
-  decorateNameTiles();
-}
-function reopenNameStyle(){ openNameStyle(); }
-function openTheme(){
-  const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\');openTheme()">'+ICO.close+'</button>':'')+'</div>'; };
-  const sw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\');openTheme()"></button>').join('')+'</div>';
-  openModal('Change Theme','<div class="ff-l">Primary colour</div>'+colInput('A')+sw('A')
-    +'<div class="ff-l">Secondary colour</div>'+colInput('B')+sw('B')
-    +'<div class="hempty">Two colours tint your profile (under the banner), like Discord — pick any colour.</div>'
-    +'<div class="mdl-foot"><span class="mdl-count"></span><button class="act primary" onclick="closeModal()">Done</button></div>');
-}
-function openBanner(){
-  openModal('Change Banner','<div class="st-row"><button class="act ghost" onclick="stuUpload(\'banner\')">⬆ Upload banner</button></div>'
-    +stuSlider('bnBright','Brightness',20,180,'%')+stuSlider('bnContrast','Contrast',20,180,'%')
-    +stuSlider('bnSat','Saturation',0,200,'%')+stuSlider('bnHue','Hue',0,360,'°')
-    +'<div class="mdl-foot"><button class="act ghost" onclick="stuExport(\'banner\')">Save to PC</button><button class="act primary" onclick="closeModal()">Done</button></div>');
-}
-function openAvatar(){
-  openModal('Change Avatar','<div class="st-row"><button class="act ghost" onclick="stuUpload(\'avatar\')">⬆ Upload avatar</button></div>'
-    +stuSlider('avBright','Brightness',20,180,'%')+stuSlider('avContrast','Contrast',20,180,'%')
-    +stuSlider('avSat','Saturation',0,200,'%')+stuSlider('avHue','Hue',0,360,'°')+stuSlider('zoom','Zoom',100,300,'%')
-    +'<div class="hempty">Drag the avatar in the preview to reposition.</div>'
-    +'<div class="mdl-foot"><button class="act ghost" onclick="stuExport(\'avatar\')">Save to PC</button><button class="act primary" onclick="closeModal()">Done</button></div>');
-}
-/* wishlist (kept locally, persisted with your look) */
+/* wishlist (kept with your look; heart-toggle from any picker) */
 let WISHLIST=[];
 function isWished(sku){ return WISHLIST.indexOf(sku)>=0; }
-function wishToggle(sku){ const i=WISHLIST.indexOf(sku); if(i>=0){WISHLIST.splice(i,1);toast('Removed from wishlist');} else {WISHLIST.push(sku);toast('Added to wishlist');} saveStudio(); }
+function wishToggle(sku){ const i=WISHLIST.indexOf(sku); if(i>=0){WISHLIST.splice(i,1);toast('Removed from wishlist');} else {WISHLIST.push(sku);toast('Added to wishlist');} saveStudio(); render(); }
 
 /* ====================== stats + profile ====================== */
 function fmtTime(sec){ const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60); return h>0?h+'h '+m+'m':m+'m'; }
@@ -1859,13 +1862,15 @@ function broadcastPresence(){
 }
 function clearPresenceUI(){ send('clearPresence'); toast('Presence cleared'); }
 function profileHtml(){
-  return '<div class="profile">'
-    +studioHtml()
-    +'<div class="hsec"><div class="hsec-head"><h3>All-time stats</h3></div><div class="statgrid">'+statTiles()+'</div></div>'
+  const left=studioHtml()
+    +'<div class="hsec" style="margin-top:26px"><div class="hsec-head"><h3>All-time stats</h3></div><div class="statgrid">'+statTiles()+'</div></div>'
     +'<div class="hsec"><div class="hsec-head"><h3>Custom Rich Presence</h3></div>'
       +'<div class="hempty" style="margin:-4px 0 12px">Click the activity type or any line to edit it — just like Discord. It shows on your profile to friends while the app is open (a quest game overrides it).</div>'
-      +'<div class="rpwrap">'+presenceEditorCard()+'</div></div>'
-    +'</div>';
+      +'<div class="rpwrap">'+presenceEditorCard()+'</div></div>';
+  const right='<div class="prof-right"><div class="studio-preview">'+profileCard('studio')+'</div>'
+    +'<div class="np-side"><div class="np-side-h">Nameplate · member list</div>'
+    +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div></div>';
+  return '<div class="profile"><div class="prof2col"><div class="prof-left">'+left+'</div>'+right+'</div></div>';
 }
 
 /* ====================== quest history ====================== */
@@ -1948,7 +1953,8 @@ const ICO={
   party:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4.5-11 6.5 6.5z"/><path d="M15 4.5v.01M19.5 9v.01M18 3l1.6 1.6M20.5 13.5h.01"/></svg>',
   refresh:'<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 11-2.6-6.1"/><path d="M20.5 4.5V10H15"/></svg>',
   close:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-  heart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5l-1.5-1.35C5.4 14.6 2.5 12 2.5 8.75 2.5 6.4 4.4 4.5 6.75 4.5c1.4 0 2.75.66 3.6 1.7l.65.8.65-.8A4.7 4.7 0 0117.25 4.5c2.35 0 4.25 1.9 4.25 4.25 0 3.25-2.9 5.85-8 10.4z"/></svg>'
+  heart:'<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20.5l-1.5-1.35C5.4 14.6 2.5 12 2.5 8.75 2.5 6.4 4.4 4.5 6.75 4.5c1.4 0 2.75.66 3.6 1.7l.65.8.65-.8A4.7 4.7 0 0117.25 4.5c2.35 0 4.25 1.9 4.25 4.25 0 3.25-2.9 5.85-8 10.4z"/></svg>',
+  back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>'
 };
 
 function counts(){
