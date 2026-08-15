@@ -2036,12 +2036,13 @@ dependencies = [
 
 [[package]]
 name = "quest_scanner"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "aes-gcm",
  "base64",
  "chrono",
  "ico",
+ "png",
  "regex",
  "serde",
  "serde_json",

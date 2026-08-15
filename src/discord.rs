@@ -105,9 +105,11 @@ impl DiscordClient {
         let deco = me["avatar_decoration_data"]["asset"].as_str().map(|a| {
             format!("https://cdn.discordapp.com/avatar-decoration-presets/{a}.png?size=240")
         });
-        let nameplate = me["collectibles"]["nameplate"]["asset"].as_str().map(|a| {
-            format!("https://cdn.discordapp.com/assets/collectibles/{a}static.png")
-        });
+        let np_asset = me["collectibles"]["nameplate"]["asset"].as_str();
+        let nameplate = np_asset
+            .map(|a| format!("https://cdn.discordapp.com/assets/collectibles/{a}static.png"));
+        let nameplate_video = np_asset
+            .map(|a| format!("https://cdn.discordapp.com/assets/collectibles/{a}asset.webm"));
         // Resolve equipped profile effect (animated) and profile frame (layers +
         // geometry) against the catalog — best-effort, one catalog fetch.
         let catalog: Vec<Value> = self
@@ -152,7 +154,7 @@ impl DiscordClient {
             "name": me["global_name"].as_str().or(me["username"].as_str()).unwrap_or("You"),
             "username": me["username"],
             "avatar": avatar, "banner": banner, "decoration": deco,
-            "nameplate": nameplate, "effectAnim": effect_anim,
+            "nameplate": nameplate, "nameplateVideo": nameplate_video, "effectAnim": effect_anim,
             "frameLayers": frame_layers, "frameMetrics": frame_metrics,
             "themeA": hexc(&up["theme_colors"][0]), "themeB": hexc(&up["theme_colors"][1]),
             "nameColors": ncolors,
@@ -396,6 +398,14 @@ impl DiscordClient {
                 } else {
                     None
                 };
+                // Nameplates animate via a looping webm behind the username.
+                let video = if ptype == 2 {
+                    item0["asset"].as_str().map(|a| {
+                        format!("https://cdn.discordapp.com/assets/collectibles/{a}asset.webm")
+                    })
+                } else {
+                    None
+                };
                 // Orb price if it has one (for a small "orb" tag; not a filter).
                 let mut orbs = None;
                 if let Some(tiers) = p["prices"].as_object() {
@@ -418,6 +428,7 @@ impl DiscordClient {
                     "layers": layers,
                     "metrics": metrics,
                     "anim": anim,
+                    "video": video,
                     "orbs": orbs,
                     "collection": cat_name,
                 }));

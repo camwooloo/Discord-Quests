@@ -113,9 +113,11 @@ svg{display:block;flex:none}
   gap:10px;padding:14px 0 18px;position:relative;z-index:3;
   background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
   border-right:1px solid var(--hairline);backdrop-filter:blur(20px)}
-.mark{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;margin-bottom:12px;
+.mark{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;margin-bottom:12px;overflow:hidden;
   background:linear-gradient(140deg,var(--accent),var(--accent-2));
   box-shadow:0 8px 24px -6px rgba(var(--accent-rgb),.7)}
+.mark:has(img){background:none;box-shadow:none}
+.mark img{width:100%;height:100%;object-fit:contain}
 .navbtn{position:relative;width:52px;height:48px;border-radius:15px;display:grid;place-items:center;
   color:var(--text-mute);transition:color .22s var(--ease),background .22s var(--ease)}
 .navbtn:hover{color:var(--text);background:var(--glass)}
@@ -581,6 +583,14 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .ppick.none.on{color:var(--accent)}
 .pp-load{grid-column:1/-1;color:var(--text-mute);font-size:12.5px;padding:8px 2px;font-weight:600}
 .pgrid-c{grid-column:1/-1;font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:.3px}
+/* nameplate preview (member-list style) */
+.np-preview{position:relative;height:46px;border-radius:10px;overflow:hidden;background:var(--glass-2);border:1px solid var(--stroke)}
+.np-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.np-row{position:relative;z-index:1;display:flex;align-items:center;gap:10px;height:100%;padding:0 12px}
+.np-av{width:28px;height:28px;border-radius:50%;overflow:hidden;flex:none;display:grid;place-items:center;background:var(--bg-1);border:1px solid rgba(255,255,255,.16)}
+.np-av img{width:100%;height:100%;object-fit:cover}
+.np-av span{font-size:12px;font-weight:800;color:var(--accent)}
+.np-name{font-size:14.5px;font-weight:650;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.55)}
 .mini.nsw{width:auto;padding:0 7px;font-size:13px;font-weight:900;line-height:22px;background:var(--glass-2)}
 /* display-name-style pickers (font / effect / colour) */
 .fontgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px}
@@ -724,15 +734,18 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .who-l:hover{text-decoration:underline}
 .who-l svg{width:12px;height:12px}
 .patch{padding:16px;border-radius:var(--radius);background:var(--glass);border:1px solid var(--stroke)}
-.patch-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.patch-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .patch-h h3{font-size:15px;font-weight:750}
-.patch-ver{margin-top:2px}
-.patch-v{font-size:14px;font-weight:800;color:var(--accent)}
-.patch-d{font-size:12px;color:var(--text-mute)}
-.patch-list{margin:8px 0 0;padding-left:16px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-dim)}
+.patch-item{border-top:1px solid var(--stroke)}
+.patch-item:first-of-type{border-top:none}
+.patch-hh{display:flex;align-items:center;gap:8px;width:100%;padding:11px 2px;text-align:left}
+.patch-hh:hover .patch-v{color:var(--accent-2)}
+.patch-v{font-size:13.5px;font-weight:800;color:var(--accent)}
+.patch-d{font-size:12px;color:var(--text-mute);flex:1}
+.patch-cv{color:var(--text-mute);transition:transform .2s var(--ease);flex:none}
+.patch-item.open .patch-cv{transform:rotate(180deg)}
+.patch-list{margin:0 0 12px;padding-left:16px;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text-dim)}
 .patch-list li{line-height:1.35}
-.patch-old{margin-top:12px;border-top:1px solid var(--stroke);padding-top:10px}
-.patch-old .patch-v{font-size:12.5px;color:var(--text-dim)}
 .chk-upd{height:34px;padding:0 12px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--text);background:var(--glass-2);border:1px solid var(--stroke)}
 .chk-upd:hover{background:var(--glass);border-color:rgba(var(--accent-rgb),.5)}
 /* quest history */
@@ -781,7 +794,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
   <div class="bg"></div>
 
   <aside class="rail">
-    <div class="mark">
+    <div class="mark" id="railMark">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0b0616" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/>
       </svg>
@@ -935,8 +948,16 @@ let USER=null, userShown=false, dataReady=false, finished=false, welcomeAt=0;
 let SHOP=null, shopLoading=false, shopFilter='all', shopSort='recent', shopErr=null, OWNED=null;
 let ORBS=null, BADGES=null, STATS=null, EQUIPPED=null, HISTORY=null, navInit=false;
 let APP_VERSION='', changelogShown=false;
+let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.3.3',d:'15 Aug 2026',notes:[
+    'Real tier icons for the four evolving badges — all 10 tiers of Account Age, Streaming, Game Diversity & Game Depth',
+    'Renamed Game Time → Game Depth and Game Variety → Game Diversity to match Discord',
+    'New Aurora logo across the sidebar, taskbar, window and installer',
+    'Nameplates now preview separately in a member-list style and animate — they no longer sit on the profile card (matching Discord)',
+    'Patch notes are collapsible, with the newest version expanded',
+  ]},
   {v:'0.3.2',d:'15 Aug 2026',notes:[
     'Profile frames now wrap correctly around the profile (inset into the frame window) instead of sitting on top',
     'Your equipped frame now shows on the Home profile too',
@@ -959,7 +980,7 @@ const CHANGELOG=[
 ];
 let pType=0, pName='', pDetails='', pState='';
 let pLargeImg='', pLargeText='', pSmallImg='', pSmallText='';
-let STU={avatar:'',banner:'',deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,
+let STU={avatar:'',banner:'',deco:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,
   avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,
   bnBright:100,bnContrast:100,bnSat:100,bnHue:0,
   nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',open:'avatar',drag:false};
@@ -1088,6 +1109,8 @@ window.setStudio=function(s){ if(s&&typeof s==='object'){ Object.assign(STU,s); 
 window.setEquipped=function(e){ EQUIPPED=e||null; if(NAV==='home'||NAV==='profile') render(); };
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
 window.setVersion=function(v){ APP_VERSION=v||''; maybeChangelog(); };
+window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); };
+window.setLogo=function(uri){ const m=byId('railMark'); if(m&&uri) m.innerHTML='<img src="'+uri+'" alt="Aurora">'; };
 window.noUpdate=function(){ toast('You\'re on the latest version'); };
 // Show the changelog once after an update (last-seen version differs from now).
 function maybeChangelog(){
@@ -1222,6 +1245,10 @@ function nameFor(id){
   if(m[id]) return m[id];
   if(id.startsWith('guild_booster')) return 'Server Booster';
   if(id.startsWith('premium_tenure')||id==='premium') return 'Discord Nitro';
+  if(id.includes('game_depth')||id.includes('game_time')) return 'Game Depth';
+  if(id.includes('game_diversity')||id.includes('game_variety')) return 'Game Diversity';
+  if(id.includes('account_age')) return 'Account Age';
+  if(id.includes('stream')) return 'Streaming';
   return id.replace(/_v?\d*$/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 }
 function earnedBadges(){ return (BADGES&&Array.isArray(BADGES.badges))?BADGES.badges:[]; }
@@ -1272,12 +1299,14 @@ function familyTier(tiers,idHints){
   for(let i=tiers.length-1;i>=0;i--) if(d.includes(tiers[i][0].toLowerCase())) return {tier:i+1,badge:b};
   return {tier:1,badge:b};
 }
-function tierFamily(title,emoji,intro,tiers,achievedCount,realIcon){
+function tierFamily(title,emoji,intro,tiers,achievedCount,realIcon,imgPrefix){
   const tiles=tiers.map((t,i)=>{
     const on=i<achievedCount, cur=i===achievedCount-1;
-    const glyph=(cur&&realIcon)
-      ? '<div class="bimg"><img src="'+realIcon+'" alt="" onerror="this.parentElement.textContent=\''+emoji+'\'"></div>'
-      : '<div class="bimg gl" style="background:radial-gradient(circle at 50% 35%,color-mix(in srgb,'+TIER_C[i]+' 60%,transparent),transparent 70%),rgba(255,255,255,.05);border-color:color-mix(in srgb,'+TIER_C[i]+' 50%,var(--stroke))">'+emoji+'</div>';
+    const localImg=imgPrefix&&BADGE_IMGS[imgPrefix+(i+1)];
+    let glyph;
+    if(localImg) glyph='<div class="bimg"><img src="'+localImg+'" alt="" onerror="this.parentElement.textContent=\''+emoji+'\'"></div>';
+    else if(cur&&realIcon) glyph='<div class="bimg"><img src="'+realIcon+'" alt="" onerror="this.parentElement.textContent=\''+emoji+'\'"></div>';
+    else glyph='<div class="bimg gl" style="background:radial-gradient(circle at 50% 35%,color-mix(in srgb,'+TIER_C[i]+' 60%,transparent),transparent 70%),rgba(255,255,255,.05);border-color:color-mix(in srgb,'+TIER_C[i]+' 50%,var(--stroke))">'+emoji+'</div>';
     return '<div class="btile'+(on?'':' locked')+(cur?' current':'')+'" data-tip="'+esc(title+' · '+t[0]+' — '+t[1]+(on?' · achieved':' · locked'))+'" style="--bc:'+TIER_C[i]+'">'
       +glyph+'<div class="bnm">'+t[0]+'</div><div class="bsub">'+t[1]+'</div></div>';
   }).join('');
@@ -1299,16 +1328,16 @@ function badgesHtml(){
 
   const giftBadge=earnedBadges().find(b=>b.id==='gifting');
   const age=familyTier(AGE_TIERS,['account_age','account age']);
-  const variety=familyTier(VARIETY_TIERS,['game_variety','variety']);
-  const gtime=familyTier(TIME_TIERS,['game_time','play_time','playtime']);
+  const diversity=familyTier(VARIETY_TIERS,['game_diversity','diversity','game_variety','variety']);
+  const depth=familyTier(TIME_TIERS,['game_depth','depth','game_time','playtime']);
   const stream=familyTier(STREAM_TIERS,['stream']);
   const ageT=age.tier||ageDone; // fall back to computed age if the badge isn't rolled out yet
   const rolling='Discord is rolling this badge out — it lights up here automatically once it reaches your profile.';
   out+=tierFamily('Gift Giver','🎁', giftDone? 'You\'ve reached tier '+giftDone+' of 6 — send more gifts to evolve it.' : 'Send Nitro gifts to earn this evolving badge.', GIFT_TIERS, giftDone, giftBadge?badgeSrc(giftBadge):null);
-  out+=tierFamily('Account Age','🌳', age.tier? ('Tier '+age.tier+' of 10.') : ('Your account is ~'+Math.floor(ay)+' years old (tier '+ageDone+'). '+rolling), AGE_TIERS, ageT, age.badge?badgeSrc(age.badge):null);
-  out+=tierFamily('Game Variety','🎮', variety.tier? ('Tier '+variety.tier+' of 10.') : ('Play more detectable games with Discord open. '+rolling), VARIETY_TIERS, variety.tier, variety.badge?badgeSrc(variety.badge):null);
-  out+=tierFamily('Game Time','⏱️', gtime.tier? ('Tier '+gtime.tier+' of 10.') : ('Play more hours of detectable PC games. '+rolling), TIME_TIERS, gtime.tier, gtime.badge?badgeSrc(gtime.badge):null);
-  out+=tierFamily('Streaming','📹', stream.tier? ('Tier '+stream.tier+' of 10.') : ('Stream more hours to other users. '+rolling), STREAM_TIERS, stream.tier, stream.badge?badgeSrc(stream.badge):null);
+  out+=tierFamily('Account Age','🌳', age.tier? ('Tier '+age.tier+' of 10.') : ('Your account is ~'+Math.floor(ay)+' years old (tier '+ageDone+'). '+rolling), AGE_TIERS, ageT, age.badge?badgeSrc(age.badge):null, 'account_age_');
+  out+=tierFamily('Game Diversity','🎮', diversity.tier? ('Tier '+diversity.tier+' of 10.') : ('Play a wider range of detectable games with Discord open. '+rolling), VARIETY_TIERS, diversity.tier, diversity.badge?badgeSrc(diversity.badge):null, 'game_diversity_tier_');
+  out+=tierFamily('Game Depth','⏱️', depth.tier? ('Tier '+depth.tier+' of 10.') : ('Play more hours of detectable PC games. '+rolling), TIME_TIERS, depth.tier, depth.badge?badgeSrc(depth.badge):null, 'game_depth_tier_');
+  out+=tierFamily('Streaming','📹', stream.tier? ('Tier '+stream.tier+' of 10.') : ('Stream more hours to other users. '+rolling), STREAM_TIERS, stream.tier, stream.badge?badgeSrc(stream.badge):null, 'streaming_tier_');
 
   out+='<div class="bsec"><div class="bsec-h">Locked <span>'+locked.length+'</span></div><div class="bgrid">'
      +locked.map(d=>realTile({id:d.id,icon:d.icon,description:CLASSIC_DESC[d.id]},'',true)).join('')+'</div></div>';
@@ -1346,7 +1375,7 @@ function applyNameStyle(){ const el=byId('stName'); if(!el) return; el.style.fon
 function decorateNameTiles(){ const cc=NCOLORS[STU.nameColor||0]||NCOLORS[0]; NEFFECTS.forEach(e=>{ const el=byId('efs_'+e[0]); if(el) applyEffectStyle(el,e[0],cc); }); }
 // Persist the studio look (debounced) so it's remembered across launches.
 let studioSaveT=0;
-function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
+function studioBlob(){ return {deco:STU.deco,nameplate:STU.nameplate,nameplateVideo:STU.nameplateVideo,effect:STU.effect,effectAnim:STU.effectAnim,frame:STU.frame,frameLayers:STU.frameLayers,frameMetrics:STU.frameMetrics,
   nameFont:STU.nameFont,nameEffect:STU.nameEffect,nameColor:STU.nameColor,themeA:STU.themeA,themeB:STU.themeB,open:STU.open,
   avBright:STU.avBright,avContrast:STU.avContrast,avSat:STU.avSat,avHue:STU.avHue,zoom:STU.zoom,
   bnBright:STU.bnBright,bnContrast:STU.bnContrast,bnSat:STU.bnSat,bnHue:STU.bnHue}; }
@@ -1382,7 +1411,7 @@ function stuApply(){
   if(av){ av.style.filter=stuFilterAv(); av.style.backgroundImage=STU.avatar?'url("'+STU.avatar+'")':''; av.style.backgroundSize=STU.zoom+'%'; av.style.backgroundPosition=STU.posX+'% '+STU.posY+'%'; }
   if(bn){ bn.style.filter=stuFilterBn(); bn.style.backgroundImage=STU.banner?'url("'+STU.banner+'")':''; }
   const set=(id,url)=>{ const e=byId(id); if(e){ e.style.backgroundImage=url?'url("'+url+'")':''; e.style.display=url?'block':'none'; } };
-  set('stDeco',STU.deco); set('stNameplate',STU.nameplate);
+  set('stDeco',STU.deco);
   fxRender(byId('stEffect'),STU.effectAnim,STU.effect);
   frameRender(STU.frameLayers);
   applyNameStyle();
@@ -1398,12 +1427,13 @@ function stuUpload(kind){
 function catItem(sku){ return (CATALOG||SHOP||[]).find(i=>i.sku===sku); }
 // Toggle a collectible selection (deco/nameplate/effect/frame) by SKU.
 function stuPick(kind,sku){
-  if(!sku){ STU[kind]=''; if(kind==='frame'){STU.frameLayers=null;STU.frameMetrics=null;} if(kind==='effect')STU.effectAnim=null; stuApply(); saveStudio(); render(); return; }
+  if(!sku){ STU[kind]=''; if(kind==='frame'){STU.frameLayers=null;STU.frameMetrics=null;} if(kind==='effect')STU.effectAnim=null; if(kind==='nameplate')STU.nameplateVideo=''; stuApply(); saveStudio(); render(); return; }
   const it=catItem(sku); if(!it) return;
   const same=STU[kind]===it.image;
   STU[kind]=same?'':it.image;
   if(kind==='frame'){ STU.frameLayers=same?null:(it.layers||null); STU.frameMetrics=same?null:(it.metrics||null); }
   if(kind==='effect') STU.effectAnim=same?null:(it.anim||null);
+  if(kind==='nameplate') STU.nameplateVideo=same?'':(it.video||'');
   stuApply(); saveStudio(); render();
 }
 function stuFont(id){ STU.nameFont=id; applyNameStyle(); saveStudio(); render(); }
@@ -1414,7 +1444,7 @@ function stuTheme(which,hex){ const k='theme'+which; STU[k]=(STU[k]===hex?'':hex
 function stuThemeVal(which,hex,el){ STU['theme'+which]=hex; stuApply(); saveStudio(); if(el){ const l=el.parentElement.querySelector('.colhex'); if(l) l.textContent=hex; } }
 function stuOpen(s){ STU.open=(STU.open===s?'':s); saveStudio(); render(); }
 function stuReset(){
-  Object.assign(STU,{deco:'',nameplate:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
+  Object.assign(STU,{deco:'',nameplate:'',nameplateVideo:'',effect:'',effectAnim:null,frame:'',frameLayers:null,frameMetrics:null,nameFont:'default',nameEffect:'solid',nameColor:0,themeA:'',themeB:'',
     avBright:100,avContrast:100,avSat:100,avHue:0,zoom:100,posX:50,posY:50,bnBright:100,bnContrast:100,bnSat:100,bnHue:0});
   saveStudio(); render(); toast('Reset to default');
 }
@@ -1465,6 +1495,18 @@ function stuSection(id,title,swatchHtml,body){
     +(open?'<div class="cust-b">'+body+'</div>':'')+'</div>';
 }
 function swImg(url,fallback){ return url?'<span class="mini" style="background-image:url(\''+esc(url)+'\')"></span>':(fallback||''); }
+// Nameplates aren't shown on the profile — they sit behind your name in the
+// member list / DM list. Preview them there, animated (webm) when available.
+function nameplatePreview(){
+  const name=esc((USER&&USER.name)||'You');
+  const av=(USER&&USER.avatar)?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>';
+  let bg='';
+  if(STU.nameplateVideo) bg='<video class="np-bg" autoplay loop muted playsinline poster="'+esc(STU.nameplate)+'" src="'+esc(STU.nameplateVideo)+'"></video>';
+  else if(STU.nameplate) bg='<img class="np-bg" src="'+esc(STU.nameplate)+'">';
+  return '<div class="ff-l">How it looks in the member list</div>'
+    +'<div class="np-preview">'+bg+'<div class="np-row"><div class="np-av">'+av+'</div><div class="np-name">'+name+'</div></div></div>'
+    +'<div class="hempty" style="margin:2px 0 4px">Nameplates show behind your name in the member list &amp; DMs — not on your profile.</div>';
+}
 function nameStyleSwatch(){ const cc=NCOLORS[STU.nameColor||0]||NCOLORS[0]; return '<span class="mini nsw" style="background:linear-gradient(135deg,'+cc[0]+','+cc[1]+');-webkit-background-clip:text;background-clip:text;color:transparent;font-family:'+fontStack(STU.nameFont).replace(/"/g,'&quot;')+'">Aa</span>'; }
 // The user's REAL equipped Discord profile (avatar, decoration, banner,
 // nameplate, effect, name style, pronouns, connections) — read-only.
@@ -1492,7 +1534,6 @@ function equippedProfile(){
       +(e.decoration?'<div class="pp-deco" style="display:block;background-image:url(\''+esc(e.decoration)+'\')"></div>':'')
       +'<span class="pp-status"></span></div>'
     +'<div class="pp-body">'
-      +(e.nameplate?'<div class="pp-nameplate" style="display:block;background-image:url(\''+esc(e.nameplate)+'\')"></div>':'')
       +'<div class="pp-name" style="'+nameSty+'">'+name+'</div>'
       +'<div class="pp-tag">'+uname+(e.pronouns?' · <span>'+esc(e.pronouns)+'</span>':'')+'</div>'
       +heroBadges()
@@ -1522,7 +1563,6 @@ function profileCard(mode){
     +'<div class="pp-banner" id="stBanner"></div>'
     +'<div class="pp-avwrap"><div class="pp-av" id="stAvatar">'+(STU.avatar?'':(USER&&USER.avatar?'<img src="'+esc(USER.avatar)+'">':'<span>'+name.charAt(0).toUpperCase()+'</span>'))+'</div><div class="pp-deco" id="stDeco"></div><span class="pp-status"></span></div>'
     +'<div class="pp-body">'
-      +'<div class="pp-nameplate" id="stNameplate"></div>'
       +'<div class="pp-name" id="stName">'+name+'</div>'
       +'<div class="pp-tag">'+esc(handle)+' · <span>Aurora</span></div>'
       +(badges||'')
@@ -1560,7 +1600,7 @@ function studioHtml(){
   const themeSw=(which)=>'<div class="swatches wrap">'+THEMESW.map(h=>'<button class="swatch'+(STU['theme'+which]===h?' on':'')+'" style="--sw:'+h+'" onclick="stuTheme(\''+which+'\',\''+h+'\')"></button>').join('')+'</div>';
   const colInput=(which)=>{ const set=STU['theme'+which]; return '<div class="colrow"><input type="color" class="colpk" value="'+(set||'#5865f2')+'" oninput="stuThemeVal(\''+which+'\',this.value,this)"><span class="colhex">'+esc(set||'None')+'</span>'+(set?'<button class="colclr" onclick="stuTheme(\''+which+'\',\''+set+'\')" title="Clear">'+ICO.close+'</button>':'')+'</div>'; };
   const cust=
-     stuSection('nameplate','Nameplate',swImg(STU.nameplate), stuPicker('nameplate'))
+     stuSection('nameplate','Nameplate',swImg(STU.nameplate), nameplatePreview()+stuPicker('nameplate'))
     +stuSection('avatar','Avatar',swImg(STU.avatar,'<span class="mini ph"></span>'),
         '<div class="st-row"><button class="act ghost" onclick="stuUpload(\'avatar\')">⬆ Upload avatar</button></div>'
         +stuSlider('avBright','Brightness',20,180,'%')+stuSlider('avContrast','Contrast',20,180,'%')
@@ -1841,16 +1881,25 @@ function settingsHtml(){
      +'<div class="srow"><div class="txt"><div class="t">⚠ Heads up</div><div class="d">This automates quest completion and presence using your Discord account token, which is against Discord\'s Terms of Service. It works on your own account, for your own rewards, but there is a small risk to your account — use at your own discretion.</div></div></div>'
    +'</div></div>'+settingsSide()+'</div>';
 }
+let patchOpen={};
+function patchDefaultOpen(v){ return !!(CHANGELOG[0]&&CHANGELOG[0].v===v); }
+function togglePatch(v){ const cur=(patchOpen[v]!==undefined)?patchOpen[v]:patchDefaultOpen(v); patchOpen[v]=!cur; if(NAV==='settings') render(); }
+function patchEntry(c){
+  const open=(patchOpen[c.v]!==undefined)?patchOpen[c.v]:patchDefaultOpen(c.v);
+  const running=(APP_VERSION&&APP_VERSION===c.v)?' · installed':'';
+  return '<div class="patch-item'+(open?' open':'')+'">'
+    +'<button class="patch-hh" onclick="togglePatch(\''+esc(c.v)+'\')"><span class="patch-v">v'+esc(c.v)+'</span><span class="patch-d">'+esc(c.d)+running+'</span>'
+      +'<svg class="patch-cv" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>'
+    +(open?'<ul class="patch-list">'+c.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>':'')
+  +'</div>';
+}
 function settingsSide(){
-  const e=CHANGELOG[0];
-  const running=(APP_VERSION&&e&&APP_VERSION!==e.v)?(' · running v'+esc(APP_VERSION)):'';
-  const cur=e?('<div class="patch-ver"><div class="patch-v">v'+esc(e.v)+running+'</div><div class="patch-d">'+esc(e.d)+'</div></div><ul class="patch-list">'+e.notes.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul>'):'';
-  const older=CHANGELOG.slice(1,4).map(c=>'<div class="patch-old"><div class="patch-v">v'+esc(c.v)+' · '+esc(c.d)+'</div><ul class="patch-list">'+c.notes.slice(0,3).map(n=>'<li>'+esc(n)+'</li>').join('')+'</ul></div>').join('');
+  const items=CHANGELOG.map(patchEntry).join('');
   return '<div class="set-side">'
     +'<div class="who"><div class="who-t">MADE BY</div><div class="who-row"><div class="who-av">C</div>'
       +'<div><div class="who-n">camwooloo</div><span class="who-l" onclick="send(\'openExternal\',{url:\'https://camwooloo.com\'})">camwooloo.com '+ICO.ext+'</span></div></div></div>'
     +'<div class="patch"><div class="patch-h"><h3>Patch notes</h3><button class="chk-upd" onclick="checkUpdateNow()">Check for updates</button></div>'
-      +cur+older+'</div>'
+      +items+'</div>'
   +'</div>';
 }
 function setOpt(k){ SET[k]=!SET[k]; render(); send('setSetting',{key:k,value:SET[k]}); if(k==='auto_watch') syncAuto(); if(k==='auto_play') syncAutoPlay(); }

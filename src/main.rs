@@ -3,6 +3,7 @@
 // HTML/CSS UI (see ui.rs); the front-end talks back over wry IPC.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod assets;
 mod discord;
 mod gateway;
 mod history;
@@ -68,64 +69,16 @@ fn main() -> wry::Result<()> {
     run_gui()
 }
 
-/// Procedurally render the Aurora logo (rounded square, purple→green aurora
-/// gradient, white four-point sparkle) as raw RGBA pixels + edge size.
-fn icon_rgba() -> (Vec<u8>, u32) {
-    let s = 128usize;
-    let sf = s as f32;
-    let (cx, cy) = (sf / 2.0, sf / 2.0);
-    let margin = 8.0;
-    let hw = sf / 2.0 - margin;
-    let rad = 30.0;
-    let spark_r = hw * 0.64;
-    let (pr, pg, pb) = (183.0f32, 148.0, 246.0); // #b794f6
-    let (tr, tg, tb) = (52.0f32, 211.0, 153.0); // #34d399
-    let mut rgba = vec![0u8; s * s * 4];
-    for y in 0..s {
-        for x in 0..s {
-            let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
-            // rounded-rect signed distance for a crisp, anti-aliased tile
-            let (px, py) = ((fx - cx).abs(), (fy - cy).abs());
-            let (qx, qy) = (px - (hw - rad), py - (hw - rad));
-            let d = (qx.max(0.0).powi(2) + qy.max(0.0).powi(2)).sqrt()
-                + qx.max(qy).min(0.0)
-                - rad;
-            let bg_a = (0.5 - d).clamp(0.0, 1.0);
-            if bg_a <= 0.0 {
-                continue;
-            }
-            let t = ((fx + fy) / (2.0 * sf)).clamp(0.0, 1.0);
-            let mut r = pr + (tr - pr) * t;
-            let mut g = pg + (tg - pg) * t;
-            let mut b = pb + (tb - pb) * t;
-            // four-point sparkle via a concave superellipse
-            let nx = ((fx - cx) / spark_r).abs();
-            let ny = ((fy - cy) / spark_r).abs();
-            let star = nx.powf(0.42) + ny.powf(0.42);
-            let sp = (1.0 - (star - 1.0) * 6.0).clamp(0.0, 1.0);
-            r += (255.0 - r) * sp;
-            g += (255.0 - g) * sp;
-            b += (255.0 - b) * sp;
-            let i = (y * s + x) * 4;
-            rgba[i] = r as u8;
-            rgba[i + 1] = g as u8;
-            rgba[i + 2] = b as u8;
-            rgba[i + 3] = (bg_a * 255.0) as u8;
-        }
-    }
-    (rgba, s as u32)
-}
-
-/// The Aurora logo as a tao window/taskbar icon.
+/// The app logo (logo.png) as a tao window/taskbar icon.
 fn app_icon() -> Option<tao::window::Icon> {
-    let (rgba, s) = icon_rgba();
-    tao::window::Icon::from_rgba(rgba, s, s).ok()
+    let (rgba, w, h) = assets::logo_rgba()?;
+    tao::window::Icon::from_rgba(rgba, w, h).ok()
 }
 
-/// The Aurora logo as a system-tray icon.
+/// The app logo as a system-tray icon.
 fn tray_icon() -> Option<tray_icon::Icon> {
-    let (rgba, s) = icon_rgba();
-    tray_icon::Icon::from_rgba(rgba, s, s).ok()
+    let (rgba, w, h) = assets::logo_rgba()?;
+    tray_icon::Icon::from_rgba(rgba, w, h).ok()
 }
 
 /// Show a Windows toast, piggybacking on PowerShell's registered AppID so no
@@ -569,6 +522,15 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                 "window.setVersion&&window.setVersion(\"{}\")",
                 env!("CARGO_PKG_VERSION")
             )));
+            // Embedded badge icons + logo (base64 data URIs).
+            let _ = proxy.send_event(UserEvent::Eval(format!(
+                "window.setBadgeImgs&&window.setBadgeImgs({})",
+                assets::badge_uris()
+            )));
+            let _ = proxy.send_event(UserEvent::Eval(format!(
+                "window.setLogo&&window.setLogo(\"{}\")",
+                assets::logo_uri()
+            )));
             // Push saved settings alongside the quest list.
             let s = settings::load();
             if let Ok(js) = serde_json::to_string(&s) {
@@ -821,9 +783,11 @@ fn run_html_preview() {
     let equipped = client.fetch_equipped().unwrap_or_else(|_| "null".into());
     let hist = serde_json::to_string(&history::load()).unwrap_or_else(|_| "[]".into());
     let ver = env!("CARGO_PKG_VERSION");
+    let badge_imgs = assets::badge_uris();
+    let logo = assets::logo_uri();
     let page = ui::page_html().replace(
         "/*BOOTSTRAP*/",
-        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});window.setHistory({hist});window.setVersion(\"{ver}\");"),
+        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});window.setHistory({hist});window.setVersion(\"{ver}\");window.setBadgeImgs({badge_imgs});window.setLogo(\"{logo}\");"),
     );
     let out = std::env::temp_dir().join("aurora_quests_preview.html");
     let _ = std::fs::write(&out, page);

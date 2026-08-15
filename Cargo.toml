@@ -1,6 +1,6 @@
 [package]
 name = "quest_scanner"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 description = "Aurora Quests — a fast, modern native viewer/completer for Discord Quests"
 
@@ -11,6 +11,7 @@ path = "src/main.rs"
 [build-dependencies]
 winresource = "0.1"
 ico = "0.3"
+png = "0.17"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -25,6 +26,7 @@ tao = "0.36"
 tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 tray-icon = "0.19"
 tauri-winrt-notification = "0.7"
+png = "0.17"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
