@@ -1025,7 +1025,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 
 <script>
 /* ====================== state ====================== */
-let QUESTS=[], NAV='video', SORT='suggested', ORB=false, GOT=false;
+let QUESTS=[], NAV='video', SORT='suggested', ORB=false, GOT=false, ACK=false;
 let SET={launch_on_startup:false,auto_watch:false,auto_play:false,show_presence:true,start_minimized:false,splash_seen:false};
 let splashShown=false;
 let CUR=null, lastSent=-1, autoQueue=[], claiming={};
@@ -1037,6 +1037,10 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.4.1',d:'18 Aug 2026',notes:[
+    'Fixed a startup bug that fired several duplicate scans at once — the biggest cause of Discord rate-limits and CAPTCHAs. Launch now makes a single scan.',
+    'Manual Refresh now always fetches live data (the session cache is per-scan, so it never serves a stale snapshot)',
+  ]},
   {v:'0.4.0',d:'15 Aug 2026',notes:[
     'Picking an item no longer jumps back to the top, and the back button is pinned so you can keep browsing',
     'Far fewer requests to Discord (cached catalog, profile & account lookups) to avoid rate limits — plus a Refresh button on the error screen',
@@ -1264,7 +1268,7 @@ function connBlock(){
   return '<div class="pp-sub">Connections</div>'+conns.slice(0,5).map(c=>'<div class="pp-conn"><span class="pp-conn-d" style="background:'+(CI[c.type]||'var(--glass-2)')+'"></span><span class="pp-conn-n">'+esc(c.name||'')+'</span><span class="pp-conn-t">'+esc(c.type||'')+'</span></div>').join('');
 }
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
-window.setVersion=function(v){ APP_VERSION=v||''; maybeChangelog(); };
+window.setVersion=function(v){ ACK=true; APP_VERSION=v||''; maybeChangelog(); };
 window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); };
 window.setLogo=function(uri){ const m=byId('railMark'); if(m&&uri) m.innerHTML='<img src="'+uri+'" alt="Aurora">'; };
 window.noUpdate=function(){ toast('You\'re on the latest version'); };
@@ -2392,7 +2396,11 @@ setNav('home'); setSort('suggested');
 /*BOOTSTRAP*/
 send('ready');
 let tries=0;
-const kick=setInterval(()=>{ if(GOT||tries++>12){clearInterval(kick);return;} send('ready'); },500);
+// Retry only until the backend acknowledges the IPC channel (setVersion sets
+// ACK almost instantly once the handler is wired). Gating on GOT instead would
+// keep re-firing full network scans for the whole 1-3s the first scan takes,
+// bursting duplicate orbs/quests requests and tripping Discord's CAPTCHA.
+const kick=setInterval(()=>{ if(ACK||tries++>12){clearInterval(kick);return;} send('ready'); },500);
 </script>
 </body>
 </html>

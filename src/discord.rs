@@ -32,6 +32,16 @@ impl DiscordClient {
         }
     }
 
+    /// Drop the per-scan caches so the next scan fetches fresh data. Called at
+    /// the start of each scan: within one scan the caches dedup the repeated
+    /// me/profile/catalog lookups (fetch_me + fetch_equipped both need @me),
+    /// but a manual refresh must see live data, not last scan's snapshot.
+    pub fn clear_cache(&self) {
+        *self.me_cache.lock().unwrap() = None;
+        *self.profile_cache.lock().unwrap() = None;
+        *self.catalog_cache.lock().unwrap() = None;
+    }
+
     /// `/users/@me`, fetched once per session.
     fn get_me(&self) -> Result<Value, String> {
         if let Some(v) = self.me_cache.lock().unwrap().clone() {

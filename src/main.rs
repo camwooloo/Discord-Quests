@@ -560,6 +560,9 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             let sealed = sealed.clone();
             let play_info = ctx.play_info.clone();
             std::thread::spawn(move || {
+              // Fresh data each scan: the caches only dedup repeated lookups
+              // within this one scan, not across manual refreshes.
+              client.clear_cache();
               // Identity first (fast) so the welcome screen can play while quests load.
               if let Ok((name, avatar)) = client.fetch_me() {
                   let u = serde_json::json!({ "name": name, "avatar": avatar });
