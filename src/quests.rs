@@ -67,17 +67,38 @@ pub fn scan() -> Result<Vec<Quest>, String> {
     fetch(&token)
 }
 
-/// Desktop-client User-Agent used for all Discord API calls.
+// Desktop-client identity, matched to the host OS so it lines up with the real
+// locally-installed Discord client (whose token we're using). Discord targets
+// quests by client build/platform via these headers — WITHOUT them, `quests/@me`
+// returns only a stripped generic subset (no watch-video quests). The build
+// number is intentionally high so it never reads as stale; Discord accepts it.
+
+#[cfg(target_os = "linux")]
+pub const CLIENT_OS: &str = "Linux";
+#[cfg(target_os = "linux")]
+pub const CLIENT_OS_VERSION: &str = "6.12.0";
+#[cfg(target_os = "linux")]
+pub const CLIENT_VERSION: &str = "0.0.75";
+#[cfg(target_os = "linux")]
+pub const CLIENT_UA: &str =
+    "Mozilla/5.0 (X11; Linux x86_64) discord/0.0.75 Chrome/128 Electron/32 Safari/537.36";
+
+#[cfg(not(target_os = "linux"))]
+pub const CLIENT_OS: &str = "Windows";
+#[cfg(not(target_os = "linux"))]
+pub const CLIENT_OS_VERSION: &str = "10.0.26200";
+#[cfg(not(target_os = "linux"))]
+pub const CLIENT_VERSION: &str = "1.0.9251";
+#[cfg(not(target_os = "linux"))]
 pub const CLIENT_UA: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) discord/1.0.9251 Chrome/128 Electron/32 Safari/537.36";
 
-/// Desktop-client identity. Discord targets quests by client build/platform via
-/// this header — WITHOUT it, `quests/@me` returns only a stripped generic subset
-/// (no watch-video quests). The build number is intentionally high so it never
-/// reads as stale; Discord accepts it.
+/// Base64 `X-Super-Properties` header identifying the desktop client.
 pub fn super_properties() -> String {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
-    let json = r#"{"os":"Windows","browser":"Discord Client","release_channel":"stable","client_version":"1.0.9251","os_version":"10.0.26200","system_locale":"en-US","client_build_number":9999999,"native_build_number":null,"client_event_source":null}"#;
+    let json = format!(
+        r#"{{"os":"{CLIENT_OS}","browser":"Discord Client","release_channel":"stable","client_version":"{CLIENT_VERSION}","os_version":"{CLIENT_OS_VERSION}","system_locale":"en-US","client_build_number":9999999,"native_build_number":null,"client_event_source":null}}"#
+    );
     STANDARD.encode(json)
 }
 

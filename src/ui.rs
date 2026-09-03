@@ -1037,6 +1037,10 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.0',d:'3 Sep 2026',notes:[
+    'Aurora now runs on Linux too (built and tested toward Arch) — same single-binary app on WebKitGTK, with the token read from your login keyring, autostart via a .desktop entry, and notify-send notifications.',
+    'On Linux the app identifies to Discord as the real Linux desktop client instead of pretending to be Windows.',
+  ]},
   {v:'0.4.1',d:'18 Aug 2026',notes:[
     'Fixed a startup bug that fired several duplicate scans at once — the biggest cause of Discord rate-limits and CAPTCHAs. Launch now makes a single scan.',
     'Manual Refresh now always fetches live data (the session cache is per-scan, so it never serves a stale snapshot)',

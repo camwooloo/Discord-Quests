@@ -1,16 +1,16 @@
 // Persisted profile-studio selections (decoration/nameplate/effect/frame, name
 // style, theme, slider adjustments). Stored as an opaque JSON blob the front-end
-// owns, in %APPDATA%\AuroraQuests\studio.json — so the look is remembered until
-// the user hits "Reset all".
+// owns, as studio.json in the per-user config dir — so the look is remembered
+// until the user hits "Reset all".
 
 use std::path::PathBuf;
 
 use serde_json::Value;
 
+use crate::platform;
+
 fn path() -> PathBuf {
-    PathBuf::from(std::env::var("APPDATA").unwrap_or_default())
-        .join("AuroraQuests")
-        .join("studio.json")
+    platform::config_dir().join("studio.json")
 }
 
 /// The saved studio blob, or JSON null if nothing has been saved yet.

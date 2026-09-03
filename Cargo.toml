@@ -1,6 +1,6 @@
 [package]
 name = "quest_scanner"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 description = "Aurora Quests — a fast, modern native viewer/completer for Discord Quests"
 
@@ -8,31 +8,42 @@ description = "Aurora Quests — a fast, modern native viewer/completer for Disc
 name = "discord_quests"
 path = "src/main.rs"
 
-[build-dependencies]
-winresource = "0.1"
-ico = "0.3"
-png = "0.17"
-
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ureq = { version = "2", features = ["json"] }
 base64 = "0.22"
-aes-gcm = "0.10"
 regex = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 wry = "0.56"
 tao = "0.36"
 tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 tray-icon = "0.19"
-tauri-winrt-notification = "0.7"
 png = "0.17"
 
+# --- Windows -------------------------------------------------------------
 [target.'cfg(windows)'.dependencies]
+# DPAPI (token master key) + WinRT toast notifications.
 windows = { version = "0.58", features = [
     "Win32_Security_Cryptography",
     "Win32_Foundation",
 ] }
+aes-gcm = "0.10"
+tauri-winrt-notification = "0.7"
+
+[target.'cfg(windows)'.build-dependencies]
+# Embeds logo.png as the .exe file icon (see build.rs). Windows-host only.
+winresource = "0.1"
+ico = "0.3"
+png = "0.17"
+
+# --- Linux / Unix --------------------------------------------------------
+[target.'cfg(unix)'.dependencies]
+# Chromium OSCrypt token unwrap: PBKDF2-HMAC-SHA1 → AES-128-CBC.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc", "block-padding"] }
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+sha1 = "0.10"
 
 # Optimize for a small, fast release binary.
 [profile.release]

@@ -48,12 +48,13 @@ impl Presence {
 }
 
 fn identity_properties() -> Value {
+    use crate::quests::{CLIENT_OS, CLIENT_OS_VERSION, CLIENT_VERSION};
     json!({
-        "os": "Windows",
+        "os": CLIENT_OS,
         "browser": "Discord Client",
         "release_channel": "stable",
-        "client_version": "1.0.9251",
-        "os_version": "10.0.26200",
+        "client_version": CLIENT_VERSION,
+        "os_version": CLIENT_OS_VERSION,
         "system_locale": "en-US",
         "client_build_number": 9_999_999,
         "native_build_number": Value::Null,

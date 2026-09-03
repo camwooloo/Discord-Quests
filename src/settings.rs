@@ -1,14 +1,15 @@
-// Persisted user settings + Windows "launch on startup" integration.
+// Persisted user settings + "launch on startup" integration.
 //
-// Settings live in %APPDATA%\AuroraQuests\settings.json. Startup is the standard
-// per-user Run key (HKCU), written via `reg` so no extra registry crate is needed.
+// Settings live in the per-user config dir (see platform::config_dir):
+// `%APPDATA%\AuroraQuests` on Windows, `~/.config/AuroraQuests` on Linux.
+// Autostart is delegated to platform::set_autostart (HKCU Run key on Windows,
+// an autostart `.desktop` entry on Linux).
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-const RUN_VALUE: &str = "AuroraQuests";
+use crate::platform;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
@@ -62,8 +63,7 @@ impl Default for Settings {
 }
 
 fn config_path() -> PathBuf {
-    let base = std::env::var("APPDATA").unwrap_or_default();
-    PathBuf::from(base).join("AuroraQuests").join("settings.json")
+    platform::config_dir().join("settings.json")
 }
 
 pub fn load() -> Settings {
@@ -81,30 +81,5 @@ pub fn save(s: &Settings) {
     if let Ok(json) = serde_json::to_string_pretty(s) {
         let _ = std::fs::write(&path, json);
     }
-    apply_startup(s.launch_on_startup, s.start_minimized);
+    platform::set_autostart(s.launch_on_startup, s.start_minimized);
 }
-
-/// Add/remove the HKCU Run entry so Windows launches the app at sign-in.
-fn apply_startup(enabled: bool, minimized: bool) {
-    let Ok(exe) = std::env::current_exe() else { return };
-    if enabled {
-        let mut cmd = format!("\"{}\"", exe.display());
-        if minimized {
-            cmd.push_str(" --minimized");
-        }
-        let _ = std::process::Command::new("reg")
-            .args(["add", RUN_KEY, "/v", RUN_VALUE, "/t", "REG_SZ", "/d", &cmd, "/f"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output();
-    } else {
-        let _ = std::process::Command::new("reg")
-            .args(["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output();
-    }
-}
-
-/// Don't flash a console window when shelling out to `reg`.
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
-use std::os::windows::process::CommandExt;

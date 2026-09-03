@@ -1,9 +1,11 @@
 // Persisted all-time stats: orbs earned, quests completed, seconds farmed, and a
-// daily-use streak. Stored alongside settings in %APPDATA%\AuroraQuests\stats.json.
+// daily-use streak. Stored alongside settings as stats.json in the config dir.
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+
+use crate::platform;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(default)]
@@ -16,9 +18,7 @@ pub struct Stats {
 }
 
 fn path() -> PathBuf {
-    PathBuf::from(std::env::var("APPDATA").unwrap_or_default())
-        .join("AuroraQuests")
-        .join("stats.json")
+    platform::config_dir().join("stats.json")
 }
 
 pub fn load() -> Stats {

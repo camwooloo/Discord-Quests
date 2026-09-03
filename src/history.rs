@@ -1,9 +1,11 @@
 // A log of completed quests (name, category, orbs, date) for the History view.
-// Stored in %APPDATA%\AuroraQuests\history.json, newest last, capped at 500.
+// Stored in the per-user config dir as history.json, newest last, capped at 500.
 
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+
+use crate::platform;
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Entry {
@@ -14,9 +16,7 @@ pub struct Entry {
 }
 
 fn path() -> PathBuf {
-    PathBuf::from(std::env::var("APPDATA").unwrap_or_default())
-        .join("AuroraQuests")
-        .join("history.json")
+    platform::config_dir().join("history.json")
 }
 
 pub fn load() -> Vec<Entry> {

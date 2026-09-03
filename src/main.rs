@@ -7,6 +7,7 @@ mod assets;
 mod discord;
 mod gateway;
 mod history;
+mod platform;
 mod quests;
 mod settings;
 mod stats;
@@ -79,16 +80,6 @@ fn app_icon() -> Option<tao::window::Icon> {
 fn tray_icon() -> Option<tray_icon::Icon> {
     let (rgba, w, h) = assets::logo_rgba()?;
     tray_icon::Icon::from_rgba(rgba, w, h).ok()
-}
-
-/// Show a Windows toast, piggybacking on PowerShell's registered AppID so no
-/// manifest/registration is required. Best-effort — silently ignores failures.
-fn notify(title: &str, body: &str) {
-    use tauri_winrt_notification::Toast;
-    let _ = Toast::new(Toast::POWERSHELL_APP_ID)
-        .title(title)
-        .text1(body)
-        .show();
 }
 
 fn run_gui() -> wry::Result<()> {
@@ -179,7 +170,7 @@ fn run_gui() -> wry::Result<()> {
                 UserEvent::Drag => {
                     let _ = window.drag_window();
                 }
-                UserEvent::OpenExternal(url) => open_external(&url),
+                UserEvent::OpenExternal(url) => platform::open_external(&url),
             },
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -279,7 +270,7 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             if settings::load().notifications {
                 let title = v["title"].as_str().unwrap_or("Aurora Quests").to_string();
                 let body = v["body"].as_str().unwrap_or("").to_string();
-                std::thread::spawn(move || notify(&title, &body));
+                std::thread::spawn(move || platform::notify(&title, &body));
             }
         }
         "applyUpdate" => {
@@ -501,7 +492,7 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                                 Some(n) => format!("+{n} orbs claimed from Discord Quests"),
                                 None => "Quest reward claimed".to_string(),
                             };
-                            notify("Reward claimed", &body);
+                            platform::notify("Reward claimed", &body);
                         }
                         format!(
                             "window.claimResult({idj},true,{})",
@@ -598,7 +589,7 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                             if let (Some(app), true) =
                                 (&q.app_id, q.category == quests::Category::Game)
                             {
-                                let exe = plausible_exe_path(&q.app_name);
+                                let exe = platform::plausible_exe_path(&q.app_name);
                                 let name = if q.app_name.is_empty() {
                                     q.name.clone()
                                 } else {
@@ -666,20 +657,6 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
         }
         _ => {}
     }
-}
-
-/// A plausible per-game executable path so heartbeats mirror a real client.
-fn plausible_exe_path(game: &str) -> String {
-    let clean: String = game
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == ' ')
-        .collect::<String>()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
-    let name = if clean.is_empty() { "Game".to_string() } else { clean };
-    let exe = name.replace(' ', "");
-    format!("C:\\Program Files\\{name}\\{exe}.exe")
 }
 
 /// Begin (or restart) a play session: heartbeat the quest on an interval until
@@ -758,19 +735,6 @@ fn start_play(id: &str, ctx: &IpcCtx) {
             *p = None;
         }
     });
-}
-
-fn open_external(url: &str) {
-    use std::os::windows::process::CommandExt;
-    // http(s) links open in the browser; discord:// hands off to the client.
-    // CREATE_NO_WINDOW avoids the console flash the old `cmd /C start` caused.
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("discord://") {
-        let _ = std::process::Command::new("cmd")
-            .args(["/C", "start", "", url])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
-    }
 }
 
 /// `--html`: render the page with live quest data to a temp file (for design

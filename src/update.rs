@@ -25,12 +25,25 @@ pub fn check() -> Option<(String, String, String)> {
     }
     let url = v["assets"].as_array()?.iter().find_map(|a| {
         let name = a["name"].as_str()?;
-        name.ends_with(".exe")
+        is_asset_for_this_os(name)
             .then(|| a["browser_download_url"].as_str().map(str::to_string))
             .flatten()
     })?;
     let notes = v["body"].as_str().unwrap_or("").to_string();
     Some((tag, url, notes))
+}
+
+/// Which release asset matches the running platform. Windows ships
+/// `discord_quests.exe`; Linux ships `discord_quests-linux-x86_64`.
+fn is_asset_for_this_os(name: &str) -> bool {
+    #[cfg(windows)]
+    {
+        name.ends_with(".exe")
+    }
+    #[cfg(not(windows))]
+    {
+        name.contains("linux") && !name.ends_with(".exe")
+    }
 }
 
 /// Compare dotted version strings (e.g. "0.3.1" > "0.3.0").
@@ -71,6 +84,13 @@ pub fn apply(download_url: &str) -> Result<(), String> {
     if let Err(e) = std::fs::write(&exe, &bytes) {
         let _ = std::fs::rename(&old, &exe); // roll back on failure
         return Err(e.to_string());
+    }
+    // A freshly written file is 0644 on Unix — restore the executable bit so the
+    // relaunch can run it (no-op on Windows).
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
     }
     Ok(())
 }
