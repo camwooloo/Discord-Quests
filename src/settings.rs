@@ -38,6 +38,10 @@ pub struct Settings {
     pub notifications: bool,
     /// Minimize to the system tray instead of the taskbar.
     pub minimize_to_tray: bool,
+    /// Keep the device awake (no idle sleep) while a video or game quest runs.
+    pub keep_awake: bool,
+    /// Whether the one-time "keep awake?" popup has been shown.
+    pub keep_awake_prompted: bool,
     /// Last app version whose changelog the user has seen (for the update popup).
     pub last_seen_version: String,
 }
@@ -57,6 +61,8 @@ impl Default for Settings {
             accent: "aurora".into(),
             notifications: false,
             minimize_to_tray: false,
+            keep_awake: false,
+            keep_awake_prompted: false,
             last_seen_version: String::new(),
         }
     }

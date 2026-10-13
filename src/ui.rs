@@ -1026,7 +1026,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 <script>
 /* ====================== state ====================== */
 let QUESTS=[], NAV='video', SORT='suggested', ORB=false, GOT=false, ACK=false;
-let SET={launch_on_startup:false,auto_watch:false,auto_play:false,show_presence:true,start_minimized:false,splash_seen:false};
+let SET={launch_on_startup:false,auto_watch:false,auto_play:false,show_presence:true,start_minimized:false,splash_seen:false,keep_awake:false};
 let splashShown=false;
 let CUR=null, lastSent=-1, autoQueue=[], claiming={};
 let CURPLAY=null, playQueue=[];
@@ -1037,6 +1037,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.1',d:'13 Oct 2026',notes:[
+    'New "Keep device awake" setting: while a video or game quest is running, your laptop won\'t drift off to sleep and interrupt it. Off by default — turn it on in Settings › Automation.',
+  ]},
   {v:'0.5.0',d:'3 Sep 2026',notes:[
     'Aurora now runs on Linux too (built and tested toward Arch) — same single-binary app on WebKitGTK, with the token read from your login keyring, autostart via a .desktop entry, and notify-send notifications.',
     'On Linux the app identifies to Discord as the real Linux desktop client instead of pretending to be Windows.',
@@ -1225,7 +1228,7 @@ window.setError=function(msg){ GOT=true;
 };
 window.setSettings=function(s){ SET=Object.assign(SET,s||{}); applyTheme();
   if(!navInit){ navInit=true; if(SET.default_page && TITLES[SET.default_page] && SET.default_page!=='home') setNav(SET.default_page); }
-  if(NAV==='settings') render(); syncAuto(); maybeSplash(); maybeChangelog(); };
+  if(NAV==='settings') render(); syncAuto(); maybeSplash(); maybeChangelog(); maybeAwakePrompt(); };
 function setDefaultPage(p){ SET.default_page=p; send('setSettingStr',{key:'default_page',value:p}); render(); }
 const ACCENTS={aurora:['#b794f6','#34d399','183,148,246'],emerald:['#3ddc84','#22d3ee','61,220,132'],sky:['#9ec5ff','#6ea8fe','158,197,255'],gold:['#f3c969','#e0a13a','243,201,105'],cyber:['#fcee0a','#00f0ff','252,238,10']};
 function applyTheme(){
@@ -1292,8 +1295,36 @@ function showChangelog(isUpdate){
   w.innerHTML='<div class="clog"><div class="clog-h"><div class="clog-badge">'+ICO.party+'</div>'
     +'<div><div class="clog-t">'+(isUpdate?'Updated to':'What\\u2019s new in')+' v'+esc(e.v)+'</div><div class="clog-d">'+esc(e.d)+'</div></div></div>'
     +'<ul class="clog-list">'+items+'</ul>'
-    +'<button class="act primary" style="width:100%" onclick="byId(\'clogWrap\').remove()">Got it</button></div>';
+    +'<button class="act primary" style="width:100%" onclick="closeChangelog()">Got it</button></div>';
   document.body.appendChild(w);
+}
+function closeChangelog(){ const w=byId('clogWrap'); if(w) w.remove(); maybeAwakePrompt(); }
+// One-time "keep awake?" offer for the 0.5.1 feature. Waits for settings and
+// for the changelog popup to close, then never shows again once seen.
+let awakePromptShown=false;
+function maybeAwakePrompt(){
+  if(awakePromptShown||!APP_VERSION||SET.keep_awake_prompted===undefined) return;
+  if(SET.keep_awake_prompted||SET.keep_awake||byId('clogWrap')) return;
+  awakePromptShown=true;
+  SET.keep_awake_prompted=true; send('setSetting',{key:'keep_awake_prompted',value:true});
+  const w=document.createElement('div'); w.className='clog-wrap'; w.id='awakeWrap';
+  w.innerHTML='<div class="clog"><div class="clog-h"><div class="clog-badge">'+ICO.bolt+'</div>'
+    +'<div><div class="clog-t">Keep your device awake?</div><div class="clog-d">New in v'+esc(APP_VERSION)+'</div></div></div>'
+    +'<div class="srow" style="padding:0 0 18px;border:0"><div class="txt"><div class="t">Keep device awake</div><div class="d">Stops your laptop going to sleep while a video or game quest is running, so farming isn\'t interrupted. You can change this any time in Settings.</div></div>'
+    +'<button class="sw" id="awakeSw" onclick="awakePromptToggle()"></button></div>'
+    +'<button class="act ghost" id="awakeGo" style="width:100%" onclick="byId(\'awakeWrap\').remove()">Not Now</button></div>';
+  document.body.appendChild(w);
+}
+function awakePromptToggle(){
+  setOpt('keep_awake');
+  byId('awakeSw').classList.toggle('on',!!SET.keep_awake);
+  const b=byId('awakeGo'); b.textContent=SET.keep_awake?'Done':'Not Now'; b.className='act '+(SET.keep_awake?'primary':'ghost');
+}
+// Hold a "don't sleep" lock only while the setting is on AND a quest is running.
+let awakeSent=null;
+function syncAwake(){
+  const on=!!(SET.keep_awake&&(CUR||CURPLAY));
+  if(on!==awakeSent){ awakeSent=on; send('keepAwake',{on:on}); }
 }
 function checkUpdateNow(){ toast('Checking for updates…'); send('checkUpdate'); }
 window.updateAvailable=function(info){
@@ -2016,6 +2047,7 @@ function homeHtml(){
 
 /* ====================== render ====================== */
 const ICO={
+  bolt:'<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2.5L4.5 13.5H12l-1 8 8.5-11H12z"/></svg>',
   clock:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.6V12l2.8 1.7"/></svg>',
   gift:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="11.5" rx="2.2"/><path d="M3 13h18M12 9v11.5"/><path d="M12 9S10.7 5 8.6 5a2 2 0 000 4zM12 9s1.3-4 3.4-4a2 2 0 010 4z"/></svg>',
   play:'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2l11 6.8-11 6.8z"/></svg>',
@@ -2040,6 +2072,7 @@ function counts(){
 }
 
 function render(){
+  syncAwake();
   counts();
   const c=byId('content');
   if(NAV==='settings'){ c.innerHTML=settingsHtml(); return; }
@@ -2136,6 +2169,7 @@ function settingsHtml(){
      +'<div class="srow"><div class="txt"><div class="t">Auto watch</div><div class="d">Work through your pending video quests one after another in the background. Videos play muted in the dock and progress is reported as they genuinely play.</div></div>'+sw('auto_watch')+'</div>'
      +'<div class="srow"><div class="txt"><div class="t">Auto play</div><div class="d">Work through your pending game quests one after another, mimicking each game so it counts toward the quest. Each game takes its full playtime (~15 min).</div></div>'+sw('auto_play')+'</div>'
      +'<div class="srow"><div class="txt"><div class="t">Show game on my profile</div><div class="d">While mimicking a game, broadcast it as your Discord status so it shows on your profile as if you were playing. On by default — turn off to keep it private.</div></div>'+sw('show_presence')+'</div>'
+     +'<div class="srow"><div class="txt"><div class="t">Keep device awake</div><div class="d">Stop your computer from going to sleep while a video or game quest is running, so laptops don\'t interrupt quest farming. The screen can still turn off. Off by default.</div></div>'+sw('keep_awake')+'</div>'
    +'</div>'
    +'<div class="sgroup"><h3>About</h3>'
      +'<div class="srow"><div class="txt"><div class="t">Aurora Quests</div><div class="d">Reads the quests from your signed-in Discord client on this PC — nothing is sent anywhere else. Videos and games run in real time (a 30s quest takes 30s).</div></div></div>'
