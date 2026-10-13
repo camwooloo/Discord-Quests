@@ -40,6 +40,9 @@ enum UserEvent {
     Close,
     Drag,
     OpenExternal(String),
+    /// Hold/release the "don't sleep" request (on the main thread — see
+    /// platform::keep_awake).
+    KeepAwake(bool),
 }
 
 /// id -> (task_key, target_seconds) for the current quest set.
@@ -166,16 +169,23 @@ fn run_gui() -> wry::Result<()> {
                     window.set_minimized(false);
                     window.set_focus();
                 }
-                UserEvent::Close => *control_flow = ControlFlow::Exit,
+                UserEvent::Close => {
+                    platform::keep_awake(false);
+                    *control_flow = ControlFlow::Exit;
+                }
                 UserEvent::Drag => {
                     let _ = window.drag_window();
                 }
                 UserEvent::OpenExternal(url) => platform::open_external(&url),
+                UserEvent::KeepAwake(on) => platform::keep_awake(on),
             },
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => {
+                platform::keep_awake(false);
+                *control_flow = ControlFlow::Exit;
+            }
             _ => {}
         }
     });
@@ -290,6 +300,12 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                     }
                 });
             }
+        }
+        "keepAwake" => {
+            // The UI sends this whenever "setting on && a quest is running"
+            // changes (it owns both halves of that, see syncAwake in ui.rs).
+            let on = v["on"].as_bool().unwrap_or(false);
+            let _ = proxy.send_event(UserEvent::KeepAwake(on));
         }
         "close" => {
             let _ = proxy.send_event(UserEvent::Close);
@@ -419,6 +435,8 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                     "splash_seen" => s.splash_seen = val,
                     "notifications" => s.notifications = val,
                     "minimize_to_tray" => s.minimize_to_tray = val,
+                    "keep_awake" => s.keep_awake = val,
+                    "keep_awake_prompted" => s.keep_awake_prompted = val,
                     _ => return,
                 }
                 settings::save(&s);

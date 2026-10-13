@@ -154,6 +154,67 @@ pub fn set_autostart(enabled: bool, minimized: bool) {
 }
 
 // ---------------------------------------------------------------------------
+// Keep the device awake while a quest is running
+// ---------------------------------------------------------------------------
+
+/// Hold (or release) a "don't sleep" request so an idle laptop doesn't suspend
+/// mid-quest. Only the system is kept awake — the display may still turn off.
+///
+/// Windows: `SetThreadExecutionState` is per-thread, so this must be called
+/// from a long-lived thread (the main event loop does it).
+#[cfg(windows)]
+pub fn keep_awake(on: bool) {
+    use windows::Win32::System::Power::{
+        SetThreadExecutionState, ES_CONTINUOUS, ES_SYSTEM_REQUIRED,
+    };
+    let flags = if on {
+        ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+    } else {
+        ES_CONTINUOUS
+    };
+    unsafe {
+        SetThreadExecutionState(flags);
+    }
+}
+
+/// Linux: a `systemd-inhibit` idle+sleep lock held by a child process. The
+/// child is `tail --pid=<us>`, so the lock also drops if we exit or crash.
+#[cfg(not(windows))]
+pub fn keep_awake(on: bool) {
+    use std::process::{Child, Command, Stdio};
+    use std::sync::Mutex;
+    static INHIBIT: Mutex<Option<Child>> = Mutex::new(None);
+
+    let mut held = INHIBIT.lock().unwrap();
+    if on {
+        if held.is_some() {
+            return;
+        }
+        let pid = std::process::id().to_string();
+        *held = Command::new("systemd-inhibit")
+            .args([
+                "--what=idle:sleep",
+                "--who=Aurora Quests",
+                "--why=Running a quest",
+                "--mode=block",
+                "tail",
+                "-f",
+                "/dev/null",
+                "--pid",
+                &pid,
+            ])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
+    } else if let Some(mut child) = held.take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // A plausible per-game executable path for play heartbeats
 // ---------------------------------------------------------------------------
 
