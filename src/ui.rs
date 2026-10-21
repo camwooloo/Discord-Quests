@@ -1055,6 +1055,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.4',d:'21 Oct 2026',notes:[
+    'New Badge Farm tab: Game Time runs one game for as long as you like to build up hours, and Game Variety cycles through lots of different games (popular picks or your own list from every game Discord can detect). Discord needs to be open on this PC.',
+  ]},
   {v:'0.5.3',d:'21 Oct 2026',notes:[
     'Fixed the Account Age badge showing tier 1 (Seed): it now always matches how old your account actually is',
   ]},
