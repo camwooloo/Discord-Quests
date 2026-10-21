@@ -45,6 +45,13 @@ pub fn logo_uri() -> String {
     format!("data:image/png;base64,{}", STANDARD.encode(LOGO))
 }
 
+const ORB: &[u8] = include_bytes!("orb.png");
+
+/// The orb icon as a base64 data URI (orb balance and orb amounts).
+pub fn orb_uri() -> String {
+    format!("data:image/png;base64,{}", STANDARD.encode(ORB))
+}
+
 /// The app logo decoded to RGBA (for the window + tray icons).
 pub fn logo_rgba() -> Option<(Vec<u8>, u32, u32)> {
     let mut reader = png::Decoder::new(LOGO).read_info().ok()?;

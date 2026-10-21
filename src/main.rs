@@ -676,6 +676,10 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
                 "window.setLogo&&window.setLogo(\"{}\")",
                 assets::logo_uri()
             )));
+            let _ = proxy.send_event(UserEvent::Eval(format!(
+                "window.setOrbImg&&window.setOrbImg(\"{}\")",
+                assets::orb_uri()
+            )));
             // Push saved settings alongside the quest list.
             let s = settings::load();
             if let Ok(js) = serde_json::to_string(&s) {
@@ -910,9 +914,10 @@ fn run_html_preview() {
     let ver = env!("CARGO_PKG_VERSION");
     let badge_imgs = assets::badge_uris();
     let logo = assets::logo_uri();
+    let orb = assets::orb_uri();
     let page = ui::page_html().replace(
         "/*BOOTSTRAP*/",
-        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});window.setHistory({hist});window.setVersion(\"{ver}\");window.setBadgeImgs({badge_imgs});window.setLogo(\"{logo}\");"),
+        &format!("window.setUser({{name:'Aurora',avatar:null}});window.setOrbs({orbs});window.setBadges({prof});window.setQuests({json});window.setShop({shop});window.setCatalog({catalog});window.setEquipped({equipped});window.setHistory({hist});window.setVersion(\"{ver}\");window.setBadgeImgs({badge_imgs});window.setLogo(\"{logo}\");window.setOrbImg(\"{orb}\");"),
     );
     let out = std::env::temp_dir().join("aurora_quests_preview.html");
     let _ = std::fs::write(&out, page);
