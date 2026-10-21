@@ -5,14 +5,15 @@
 // known executables running. The list of those executables is Discord's public
 // detectable-applications list (`/applications/detectable`), which we cache in
 // the config dir. To "play" a game we copy our own binary to a path ending in
-// that game's executable name and run it with `--farm-stub`, which just idles
-// until we kill it (or we exit — it watches its stdin pipe). The local Discord
-// client then detects it like the real game. If "Show game on my profile" is
-// on, we also broadcast it over the gateway, same as quest play.
+// that game's executable name and run it with `--farm-stub`, which shows a
+// small card window (Discord ignores windowless processes) until we kill it
+// or we exit (it watches its stdin pipe). The local Discord client then
+// detects it like the real game. If "Show game on my profile" is on, we also
+// broadcast it over the gateway, same as quest play.
 //
-// Two modes, one farm at a time:
-//   * hours   — one game, runs until stopped (Game Time)
-//   * variety — cycles through a list of games, N minutes each (Game Variety)
+// One farm at a time. It either cycles through a list of games, N minutes
+// each (Game Variety, and every minute also counts toward Game Time), or with
+// `minutes == 0` stays on one game until the user switches it.
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -67,35 +68,61 @@ pub struct Game {
     pub exe: String,
     /// Position in POPULAR, if it's one of the popular games.
     pub rank: Option<usize>,
+    /// CDN image hashes (`app-icons/<id>/<hash>.png`).
+    pub icon: Option<String>,
+    pub cover: Option<String>,
+}
+
+/// Time farmed on one game, with enough to show it without the full list.
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
+pub struct GameStat {
+    pub name: String,
+    pub icon: Option<String>,
+    pub cover: Option<String>,
+    pub secs: u64,
 }
 
 /// Persisted farm settings + totals (`farm.json` in the config dir).
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
-    /// App id of the game the hours mode runs (empty = most popular).
-    pub hours_game: String,
-    /// The user's own variety list (app ids, in order).
-    pub variety_custom: Vec<String>,
-    /// Use `variety_custom` instead of the popular list.
-    pub variety_use_custom: bool,
-    /// Minutes each game runs for in variety mode.
-    pub variety_minutes: u64,
-    /// All-time seconds farmed (both modes).
+    /// App id of the game "one game" mode runs (empty = first in the list).
+    #[serde(alias = "hours_game")]
+    pub single_game: String,
+    /// The user's own list (app ids, in order).
+    #[serde(alias = "variety_custom")]
+    pub custom: Vec<String>,
+    /// Use `custom` instead of the popular list.
+    #[serde(alias = "variety_use_custom")]
+    pub use_custom: bool,
+    /// Minutes each game runs for; 0 = stay on one game until switched.
+    #[serde(alias = "variety_minutes")]
+    pub minutes: u64,
+    /// All-time seconds farmed.
     pub total_secs: u64,
     /// Distinct app ids the farm has run.
     pub played: Vec<String>,
+    /// Take a break after this many minutes of farming (0 = never)…
+    pub pause_after_mins: u64,
+    /// …for this many minutes, then carry on.
+    pub pause_for_mins: u64,
+    /// Per-game totals, keyed by app id.
+    pub per_game: std::collections::BTreeMap<String, GameStat>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            hours_game: String::new(),
-            variety_custom: Vec::new(),
-            variety_use_custom: false,
-            variety_minutes: 15,
+            single_game: String::new(),
+            custom: Vec::new(),
+            use_custom: false,
+            minutes: 15,
             total_secs: 0,
             played: Vec::new(),
+            pause_after_mins: 0,
+            pause_for_mins: 60,
+            per_game: Default::default(),
         }
     }
 }
@@ -181,16 +208,18 @@ const OS_KEYS: &[&str] = &["win32"];
 const OS_KEYS: &[&str] = &["linux", "win32"];
 
 /// The first non-launcher executable for this OS, as a safe relative path.
+/// Prefers the plainest name (fewest folders), which is the game's main exe
+/// rather than a regional build like `garenalolth/.../lolex.exe`.
 fn pick_exe(app: &Value) -> Option<String> {
     let exes = app["executables"].as_array()?;
     for os in OS_KEYS {
-        for e in exes {
-            if e["os"].as_str() != Some(os) || e["is_launcher"].as_bool() == Some(true) {
-                continue;
-            }
-            if let Some(rel) = e["name"].as_str().and_then(clean_rel_path) {
-                return Some(rel);
-            }
+        let best = exes
+            .iter()
+            .filter(|e| e["os"].as_str() == Some(os) && e["is_launcher"].as_bool() != Some(true))
+            .filter_map(|e| e["name"].as_str().and_then(clean_rel_path))
+            .min_by_key(|rel| rel.matches('/').count());
+        if best.is_some() {
+            return best;
         }
     }
     None
@@ -247,7 +276,8 @@ pub fn games() -> Result<Vec<Game>, String> {
                 .chain(app["aliases"].as_array().into_iter().flatten().filter_map(Value::as_str))
                 .filter_map(|n| ranks.get(&norm(n)).copied())
                 .min();
-            Some(Game { id, name, exe, rank })
+            let hash = |k: &str| app[k].as_str().filter(|h| !h.is_empty()).map(str::to_string);
+            Some(Game { id, name, exe, rank, icon: hash("icon_hash"), cover: hash("cover_image_hash") })
         })
         .collect();
     let by_rank = |a: &Game, b: &Game| {
@@ -273,42 +303,120 @@ pub fn games() -> Result<Vec<Game>, String> {
 pub fn games_json(games: &[Game]) -> String {
     let arr: Vec<Value> = games
         .iter()
-        .map(|g| json!({ "id": g.id, "name": g.name, "pop": g.rank }))
+        .map(|g| json!({ "id": g.id, "name": g.name, "pop": g.rank, "icon": g.icon, "cover": g.cover }))
         .collect();
     Value::Array(arr).to_string()
 }
 
-/// The games a farm run uses, given the mode and saved config.
-pub fn plan(mode: &str, cfg: &Config, all: &[Game]) -> Vec<Game> {
-    let popular = all.iter().filter(|g| g.rank.is_some());
-    if mode == "hours" {
-        let chosen = all.iter().find(|g| g.id == cfg.hours_game);
-        return chosen.or_else(|| all.first()).cloned().into_iter().collect();
-    }
-    if cfg.variety_use_custom && !cfg.variety_custom.is_empty() {
-        return cfg
-            .variety_custom
+/// The games a farm run uses: the chosen list, or just one game when
+/// `minutes == 0`.
+pub fn plan(cfg: &Config, all: &[Game]) -> Vec<Game> {
+    let list: Vec<Game> = if cfg.use_custom && !cfg.custom.is_empty() {
+        cfg.custom
             .iter()
             .filter_map(|id| all.iter().find(|g| &g.id == id).cloned())
-            .collect();
+            .collect()
+    } else {
+        all.iter().filter(|g| g.rank.is_some()).take(DEFAULT_VARIETY).cloned().collect()
+    };
+    if cfg.minutes == 0 {
+        let chosen = all.iter().find(|g| g.id == cfg.single_game).cloned();
+        return chosen.or_else(|| list.into_iter().next()).into_iter().collect();
     }
-    popular.take(DEFAULT_VARIETY).cloned().collect()
+    list
 }
 
 // ---------------------------------------------------------------------------
 // The stand-in game process
 // ---------------------------------------------------------------------------
 
-/// `--farm-stub`: idle until our stdin closes (the app stopped us or exited).
-pub fn run_stub() {
-    use std::io::Read;
-    let mut buf = [0u8; 64];
-    let mut stdin = std::io::stdin();
-    while let Ok(n) = stdin.read(&mut buf) {
-        if n == 0 {
-            break;
+/// `--farm-stub <title> [image url]`: show a small card window and idle until
+/// our stdin closes (the app stopped us or exited). Discord's detector only
+/// counts processes that own a visible top-level window (a windowless stub is
+/// ignored), so the card sits in the bottom-right corner, shows the game's art
+/// and says plainly that Aurora is farming it.
+pub fn run_stub(title: &str, image: &str) {
+    use tao::dpi::{LogicalSize, PhysicalPosition};
+    use tao::event::{Event, WindowEvent};
+    use tao::event_loop::{ControlFlow, EventLoop};
+    use tao::window::WindowBuilder;
+
+    std::thread::spawn(|| {
+        use std::io::Read;
+        let mut buf = [0u8; 64];
+        let mut stdin = std::io::stdin();
+        while let Ok(n) = stdin.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
         }
+        std::process::exit(0);
+    });
+
+    let event_loop = EventLoop::new();
+    let (w, h) = (340.0, 190.0);
+    let builder = WindowBuilder::new()
+        .with_title(format!("{title} · Aurora Quests badge farm"))
+        .with_inner_size(LogicalSize::new(w, h))
+        .with_decorations(false)
+        .with_resizable(false)
+        .with_focused(false);
+    let Ok(window) = builder.build(&event_loop) else {
+        // No window possible: still idle so the process at least exists.
+        loop {
+            std::thread::sleep(Duration::from_secs(3600));
+        }
+    };
+    // Bottom-right of the primary screen, clear of the taskbar.
+    if let Some(m) = window.primary_monitor() {
+        let (sz, at, sf) = (m.size(), m.position(), m.scale_factor());
+        window.set_outer_position(PhysicalPosition::new(
+            at.x + sz.width as i32 - ((w + 16.0) * sf) as i32,
+            at.y + sz.height as i32 - ((h + 64.0) * sf) as i32,
+        ));
     }
+    let html = stub_html(title, image);
+    let _webview = wry::WebViewBuilder::new().with_html(html).build(&window);
+    event_loop.run(move |event, _, flow| {
+        *flow = ControlFlow::Wait;
+        if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = event {
+            std::process::exit(0);
+        }
+    });
+}
+
+/// The stand-in's card: game art behind an Aurora banner.
+fn stub_html(title: &str, image: &str) -> String {
+    let esc = |s: &str| {
+        s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    };
+    let art = if image.starts_with("https://cdn.discordapp.com/") {
+        format!("background-image:url(\"{}\")", esc(image))
+    } else {
+        String::new()
+    };
+    format!(
+        r#"<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;color:#fff;background:#0b0c18;user-select:none}}
+.art{{position:absolute;inset:0;background:#141633 center/cover no-repeat;{art}}}
+.art::after{{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,12,24,.15),rgba(11,12,24,.92) 72%)}}
+.top{{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:8px}}
+.logo{{width:26px;height:26px;border-radius:8px}}
+.badge{{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:4px 9px;border-radius:8px;
+  background:linear-gradient(135deg,#b48cff,#34d399);color:#0b0616}}
+.live{{margin-left:auto;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;background:rgba(11,12,24,.7)}}
+.live i{{display:inline-block;width:7px;height:7px;border-radius:50%;background:#34d399;margin-right:6px;animation:p 1.4s infinite}}
+@keyframes p{{50%{{opacity:.3}}}}
+.foot{{position:absolute;left:14px;right:14px;bottom:12px}}
+.g{{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.s{{font-size:12px;opacity:.75;margin-top:2px}}
+</style></head><body><div class="art"></div>
+<div class="top"><img class="logo" src="{logo}"><span class="badge">Aurora Quests</span><span class="live"><i></i>Badge farming</span></div>
+<div class="foot"><div class="g">{name}</div><div class="s">Stand-in run by Aurora Quests so Discord counts this game. Stop it from Aurora.</div></div>
+</body></html>"#,
+        logo = crate::assets::logo_uri(),
+        name = esc(title),
+    )
 }
 
 /// Copy our binary to `<config>/farm/<app id>/<exe path>` and start it there.
@@ -317,7 +425,7 @@ fn spawn_stub(game: &Game) -> Result<Child, String> {
     let target = platform::config_dir()
         .join("farm")
         .join(&game.id)
-        .join(&game.exe);
+        .join(game.exe.split('/').collect::<PathBuf>());
     if let Some(d) = target.parent() {
         std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
     }
@@ -340,7 +448,15 @@ fn spawn_stub(game: &Game) -> Result<Child, String> {
         }
     }
     let mut cmd = Command::new(&target);
+    let image = game
+        .cover
+        .as_ref()
+        .or(game.icon.as_ref())
+        .map(|h| format!("https://cdn.discordapp.com/app-icons/{}/{h}.png?size=512", game.id))
+        .unwrap_or_default();
     cmd.arg("--farm-stub")
+        .arg(&game.name)
+        .arg(image)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -370,67 +486,79 @@ fn kill(child: &mut Option<Child>) {
 /// Run a farm until `stop` is set. `status` receives a JSON status object every
 /// few seconds (and `null` when the farm ends).
 pub fn run(
-    mode: String,
     list: Vec<Game>,
     minutes: u64,
+    pause: Option<(Duration, Duration)>,
     stop: Arc<AtomicBool>,
     presence: Arc<Presence>,
     status: impl Fn(Value),
 ) {
     if list.is_empty() {
-        status(json!({ "mode": mode, "error": "No games to run — pick some first." }));
+        status(json!({ "error": "No games to farm — add some to your list first." }));
         return;
     }
-    let slice = if mode == "hours" {
-        None
-    } else {
-        Some(Duration::from_secs(minutes.max(1) * 60))
-    };
+    // 0 minutes = stay on the one game until the user switches.
+    let slice = (minutes > 0).then(|| Duration::from_secs(minutes * 60));
     let mut cfg = load();
     let mut idx = 0usize;
     let mut round = 1u64;
     let started = Instant::now();
+    // Farming time since the last scheduled break.
+    let mut active = Duration::ZERO;
     'outer: while !stop.load(Ordering::SeqCst) {
         let game = &list[idx];
-        let mut child = None;
         let mut error = Value::Null;
-        match spawn_stub(game) {
-            Ok(c) => child = Some(c),
-            Err(e) => error = Value::from(e),
-        }
+        let mut child = match spawn_stub(game) {
+            Ok(c) => Some(c),
+            Err(e) => {
+                error = Value::from(e);
+                None
+            }
+        };
         if crate::settings::load().show_presence {
             presence.set(&game.name, &game.id);
         }
         if !cfg.played.contains(&game.id) {
             cfg.played.push(game.id.clone());
-            save(&cfg);
         }
-        let game_start = Instant::now();
+        let entry = cfg.per_game.entry(game.id.clone()).or_default();
+        entry.name = game.name.clone();
+        entry.icon = game.icon.clone();
+        entry.cover = game.cover.clone();
+        save(&cfg);
+        let mut game_start = Instant::now();
         let mut unsaved = 0u64;
         let mut tick = 0u64;
+        let flush = |cfg: &mut Config, secs: &mut u64| {
+            cfg.total_secs += *secs;
+            cfg.per_game.entry(game.id.clone()).or_default().secs += *secs;
+            *secs = 0;
+            save(cfg);
+        };
         loop {
             if stop.load(Ordering::SeqCst) {
-                cfg.total_secs += unsaved;
-                save(&cfg);
+                flush(&mut cfg, &mut unsaved);
                 kill(&mut child);
                 break 'outer;
             }
-            // The stand-in died (antivirus, user killed it): try once more.
+            // The stand-in died (antivirus, user closed it): start it again.
             if let Some(c) = child.as_mut() {
                 if let Ok(Some(_)) = c.try_wait() {
                     child = spawn_stub(game).ok();
                 }
             }
             if tick % 5 == 0 {
+                let game_secs = cfg.per_game.get(&game.id).map(|g| g.secs).unwrap_or(0) + unsaved;
                 status(json!({
-                    "mode": mode,
                     "game": game.name,
                     "id": game.id,
                     "index": idx,
                     "count": list.len(),
                     "round": round,
-                    "gameSecs": game_start.elapsed().as_secs(),
+                    "single": slice.is_none(),
+                    "runSecs": game_start.elapsed().as_secs(),
                     "sliceSecs": slice.map(|d| d.as_secs()),
+                    "gameSecs": game_secs,
                     "sessionSecs": started.elapsed().as_secs(),
                     "totalSecs": cfg.total_secs + unsaved,
                     "played": cfg.played.len(),
@@ -440,17 +568,48 @@ pub fn run(
             if slice.map(|d| game_start.elapsed() >= d).unwrap_or(false) {
                 break;
             }
+            // Scheduled break: drop the game, wait, then pick up where we were.
+            if let Some((after, rest)) = pause {
+                if active >= after {
+                    flush(&mut cfg, &mut unsaved);
+                    kill(&mut child);
+                    presence.clear();
+                    let rest_start = Instant::now();
+                    while rest_start.elapsed() < rest {
+                        if stop.load(Ordering::SeqCst) {
+                            break 'outer;
+                        }
+                        if rest_start.elapsed().as_secs() % 5 == 0 {
+                            status(json!({
+                                "resting": true,
+                                "game": game.name,
+                                "id": game.id,
+                                "restLeft": (rest - rest_start.elapsed()).as_secs(),
+                                "totalSecs": cfg.total_secs,
+                                "played": cfg.played.len(),
+                            }));
+                        }
+                        std::thread::sleep(Duration::from_secs(1));
+                    }
+                    active = Duration::ZERO;
+                    game_start += rest_start.elapsed();
+                    child = spawn_stub(game).ok();
+                    if crate::settings::load().show_presence {
+                        presence.set(&game.name, &game.id);
+                    }
+                    tick = 0;
+                    continue;
+                }
+            }
             std::thread::sleep(Duration::from_secs(1));
             tick += 1;
             unsaved += 1;
+            active += Duration::from_secs(1);
             if unsaved >= 60 {
-                cfg.total_secs += unsaved;
-                unsaved = 0;
-                save(&cfg);
+                flush(&mut cfg, &mut unsaved);
             }
         }
-        cfg.total_secs += unsaved;
-        save(&cfg);
+        flush(&mut cfg, &mut unsaved);
         kill(&mut child);
         idx += 1;
         if idx >= list.len() {
@@ -490,17 +649,39 @@ mod tests {
     }
 
     #[test]
+    fn exe_prefers_the_plain_main_exe() {
+        let app = json!({ "executables": [
+            { "os": "win32", "name": "garenalolth/gamedata/apps/lolth/lolex.exe", "is_launcher": false },
+            { "os": "win32", "name": "league of legends.exe", "is_launcher": false },
+            { "os": "win32", "name": "leagueclientux.exe", "is_launcher": true },
+        ]});
+        assert_eq!(pick_exe(&app).as_deref(), Some("league of legends.exe"));
+    }
+
+    #[test]
     fn plan_picks_by_mode() {
-        let g = |id: &str, rank| Game { id: id.into(), name: id.into(), exe: "x.exe".into(), rank };
+        let g = |id: &str, rank| Game {
+            id: id.into(), name: id.into(), exe: "x.exe".into(), rank, icon: None, cover: None,
+        };
         let all = vec![g("a", Some(0)), g("b", Some(1)), g("c", None)];
         let mut cfg = Config::default();
-        assert_eq!(plan("hours", &cfg, &all)[0].id, "a");
-        cfg.hours_game = "c".into();
-        assert_eq!(plan("hours", &cfg, &all)[0].id, "c");
-        assert_eq!(plan("variety", &cfg, &all).len(), 2);
-        cfg.variety_use_custom = true;
-        cfg.variety_custom = vec!["c".into(), "gone".into(), "a".into()];
-        let ids: Vec<_> = plan("variety", &cfg, &all).into_iter().map(|g| g.id).collect();
+        assert_eq!(plan(&cfg, &all).len(), 2);
+        cfg.use_custom = true;
+        cfg.custom = vec!["c".into(), "gone".into(), "a".into()];
+        let ids: Vec<_> = plan(&cfg, &all).into_iter().map(|g| g.id).collect();
         assert_eq!(ids, ["c", "a"]);
+        // One-game mode: the chosen game, else the list's first.
+        cfg.minutes = 0;
+        assert_eq!(plan(&cfg, &all).iter().map(|g| g.id.as_str()).collect::<Vec<_>>(), ["c"]);
+        cfg.single_game = "b".into();
+        assert_eq!(plan(&cfg, &all)[0].id, "b");
+    }
+
+    #[test]
+    fn old_config_keys_still_load() {
+        let c: Config = serde_json::from_str(
+            r#"{"hours_game":"x","variety_custom":["a"],"variety_use_custom":true,"variety_minutes":5}"#,
+        ).unwrap();
+        assert_eq!((c.single_game.as_str(), c.custom.len(), c.use_custom, c.minutes), ("x", 1, true, 5));
     }
 }

@@ -741,20 +741,25 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .clog-list{margin:0 0 18px;padding-left:18px;display:flex;flex-direction:column;gap:7px;font-size:14px;color:var(--text-dim)}
 .clog-list li{line-height:1.4}
 /* settings two-column: settings left, about/patch-notes right */
-.farm-list{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 15px}
-.farm-g{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9px;background:var(--glass-2);
-  border:1px solid var(--stroke);font-size:12px;font-weight:600;color:var(--text-dim)}
-.farm-g button{color:var(--text-mute);font-size:12px}
-.farm-g button:hover{color:var(--text)}
-.farm-live{font-size:12.5px;color:var(--text-mute);font-weight:600}
-.farm-live b{color:var(--text)}
-.farm-res{display:flex;flex-direction:column;max-height:300px;overflow:auto;padding:0 12px 12px}
-.farm-ri{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;font-size:13px;font-weight:600}
-.farm-ri:hover{background:var(--glass-2)}
-.farm-ri .grow{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.farm-ri .pop{font-size:11px;color:var(--accent);font-weight:700}
-.farm-ri .act{width:auto;height:30px;padding:0 12px;font-size:12px;border-radius:10px}
 .farm-btn{width:auto;padding:0 18px}
+.farm-head{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:12px;border-radius:var(--radius);
+  background:linear-gradient(135deg,rgba(var(--accent-rgb),.14),rgba(52,211,153,.06)),var(--glass);border:1px solid var(--stroke)}
+.farm-head .farm-now{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text-dim);line-height:1.45}
+.farm-head .farm-now b{color:var(--text)}
+.farm-head .farm-tot{font-size:12.5px;color:var(--text-mute);font-weight:650;text-align:right;white-space:nowrap}
+.farm-head .farm-tot b{display:block;font-size:18px;color:var(--text);font-family:"Bricolage Grotesque",system-ui}
+.farm-head .act{width:auto;padding:0 22px;height:44px;flex:none}
+.farm-ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:0 0 16px}
+.farm-ctl .grp{display:flex;align-items:center;gap:7px}
+.farm-ctl .grp>span{font-size:11.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--text-mute)}
+.farm-ctl .chip{height:32px;padding:0 12px}
+.farm-ctl .search{flex:1 1 220px;max-width:340px;margin-left:auto}
+.thumb.ficon{background-size:38%;background-color:#11142a}
+.fcard .acts{display:flex;gap:8px}
+.fcard .acts .act{height:36px;font-size:12.5px;border-radius:12px}
+.fcard.live{border-color:rgba(var(--accent-rgb),.6);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.35)}
+.fhint{color:var(--text-mute);font-size:13px;font-weight:550;padding:4px 2px 14px}
+.hist-ic{width:30px;height:30px;flex:none;border-radius:9px;background:#11142a center/cover no-repeat}
 .settings2{display:grid;grid-template-columns:1fr 340px;gap:22px;align-items:start}
 @media(max-width:920px){.settings2{grid-template-columns:1fr}}
 .set-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:14px}
@@ -927,10 +932,6 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h18v16H3z"/><path d="M3 9h18M8 3v3M16 3v3"/><path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg>
       <span class="tip">History</span>
     </button>
-    <button class="navbtn" data-nav="misc" onclick="setNav('misc')">
-      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-      <span class="tip">Misc</span>
-    </button>
     <div class="sp"></div>
     <div class="orbbal" id="orbBal" title="Your orb balance"><span class="orb-dot"></span><span id="orbBalNum">—</span></div>
     <button class="navbtn" data-nav="settings" onclick="setNav('settings')">
@@ -1055,6 +1056,14 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.0',d:'21 Oct 2026',notes:[
+    'Badge farming now actually counts: Discord only detects a game that has a window, so each farmed game opens a small Aurora card (bottom-right) with the game\'s art. It also uses each game\'s main program now (no more Garena League).',
+    'One Badge Farm instead of two: cycle through Popular or your own list for 5–30 min per game, or pick One game to farm until you switch. Hours count toward Game Time either way.',
+    'Breaks: pause every 1, 2 or 4 hours for 15 min to 2 hours, so the farm doesn\'t run 24/7',
+    'Badge Farm looks like the quest pages now: controls up top, game cards with art and hours farmed. Adding games no longer jumps back to the top.',
+    'Homepage: Start all (game quests, then videos, then badge farming) and a Badge farm button. Farming stats are on the homepage and History.',
+    'Removed the Misc tab',
+  ]},
   {v:'0.5.5',d:'21 Oct 2026',notes:[
     'Fixed the Badge Farm tab failing with "Couldn\'t load Discord\'s game list" — Discord\'s list is bigger than the old download limit',
   ]},
@@ -1416,12 +1425,12 @@ function onCompleted(q){
 }
 
 /* ====================== nav / filters ====================== */
-const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',farm:'Badge Farm',misc:'Misc',profile:'Your Profile',settings:'Settings'};
+const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',farm:'Badge Farm',profile:'Your Profile',settings:'Settings'};
 function setNav(n){
   NAV=n; custView=null; byId('pageTitle').textContent=TITLES[n];
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===n));
   byId('railAvatar').classList.toggle('active',n==='profile');
-  byId('toolbar').style.display=(['settings','shop','home','badges','profile','history','misc','farm'].includes(n))?'none':'flex';
+  byId('toolbar').style.display=(['settings','shop','home','badges','profile','history','farm'].includes(n))?'none':'flex';
   byId('watchAllBtn').style.display=(n==='video')?'flex':'none';
   byId('playAllBtn').style.display=(n==='game')?'flex':'none';
   byId('presenceBtn').style.display=(n==='game')?'flex':'none';
@@ -1976,6 +1985,7 @@ function statTiles(){
     ['✅',(s.quests_completed||0).toLocaleString(),'Quests completed'],
     ['⏱️',fmtTime(s.seconds_farmed||0),'Time farmed'],
     ['🔥',(s.streak_days||0)+(s.streak_days===1?' day':' days'),'Daily streak'],
+    ['🎮',fdur(FARM_CFG.total_secs||0)+' · '+farmPlayedN()+' games','Badge farming'],
   ];
   return items.map(i=>'<div class="stat"><div class="stat-ic">'+i[0]+'</div><div class="stat-v">'+i[1]+'</div><div class="stat-l">'+i[2]+'</div></div>').join('');
 }
@@ -2030,16 +2040,6 @@ function profileHtml(){
     +nameplateRow((USER&&USER.name)||'You',(USER&&USER.avatar),STU.nameplate,STU.nameplateVideo)+'</div></div>';
   return '<div class="profile"><div class="prof2col"><div class="prof-left">'+studioHtml()+'</div>'+right+'</div></div>';
 }
-// The Misc tab: all-time stats + the custom Rich Presence editor.
-function miscHtml(){
-  return '<div class="misc">'
-    +'<div class="hsec"><div class="hsec-head"><h3>All-time stats</h3></div><div class="hstats">'+statTiles()+'</div></div>'
-    +'<div class="hsec"><div class="hsec-head"><h3>Custom Rich Presence</h3></div>'
-      +'<div class="hempty" style="margin:-4px 0 12px">Click the activity type or any line to edit it — just like Discord. It shows on your profile to friends while the app is open (a quest game overrides it).</div>'
-      +'<div class="rpwrap">'+presenceEditorCard()+'</div></div>'
-    +'</div>';
-}
-
 /* ====================== quest history ====================== */
 function fmtDate(s){ try{ return new Date(s+'T00:00:00').toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }catch(e){ return s; } }
 function calendarHeat(counts){
@@ -2056,7 +2056,12 @@ function calendarHeat(counts){
 }
 function historyHtml(){
   if(HISTORY===null) return '<div class="mid"><div class="spin"></div><p>Loading history…</p></div>';
-  if(!HISTORY.length) return '<div class="mid"><div class="ic">'+ICO.empty+'</div><h2>No quest history yet</h2><p>Every quest you finish gets logged here with the date — your activity builds up over time.</p></div>';
+  const farmed=Object.entries(FARM_CFG.per_game||{}).filter(([,g])=>g.secs>0).sort((a,b)=>b[1].secs-a[1].secs);
+  if(!HISTORY.length&&!farmed.length) return '<div class="mid"><div class="ic">'+ICO.empty+'</div><h2>No quest history yet</h2><p>Every quest you finish gets logged here with the date — your activity builds up over time.</p></div>';
+  const farmSec=farmed.length?'<div class="hsec"><div class="hsec-head"><h3>Badge farming</h3><button class="viewall" onclick="setNav(\'farm\')">Open farm</button></div><div class="hist-list">'
+    +farmed.map(([id,g])=>{ const img=fimg({id:id,cover:g.cover,icon:g.icon});
+      return '<div class="hist-row"><span class="hist-ic"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'></span><span class="hist-n">'+esc(g.name)+'</span><span class="hist-o">'+fdur(g.secs)+'</span></div>'; }).join('')
+    +'</div></div>':'';
   const items=HISTORY.slice().reverse();
   const totalOrbs=HISTORY.reduce((s,e)=>s+(e.orbs||0),0);
   const byDate={}; items.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
@@ -2070,9 +2075,11 @@ function historyHtml(){
   const tile=(ic,v,l)=>'<div class="stat"><div class="stat-ic">'+ic+'</div><div class="stat-v">'+v+'</div><div class="stat-l">'+l+'</div></div>';
   return '<div class="history">'
     +'<div class="hstats">'+tile('✅',HISTORY.length,'Quests completed')+tile('🔮',totalOrbs.toLocaleString(),'Orbs earned')
-      +tile('📅',dates.length,'Active days')+tile('🔥',(STATS?(STATS.streak_days||0):0)+(STATS&&STATS.streak_days===1?' day':' days'),'Current streak')+'</div>'
+      +tile('📅',dates.length,'Active days')+tile('🔥',(STATS?(STATS.streak_days||0):0)+(STATS&&STATS.streak_days===1?' day':' days'),'Current streak')
+      +tile('🎮',fdur(FARM_CFG.total_secs||0),'Badge farmed')+tile('🕹️',farmPlayedN(),'Games farmed')+'</div>'
     +'<div class="hsec"><div class="hsec-head"><h3>Activity — last 14 weeks</h3></div>'+calendarHeat(counts)+'</div>'
-    +'<div class="hsec"><div class="hsec-head"><h3>Completed quests</h3></div><div class="hist-list">'+groups+'</div></div>'
+    +farmSec
+    +(groups?'<div class="hsec"><div class="hsec-head"><h3>Completed quests</h3></div><div class="hist-list">'+groups+'</div></div>':'')
   +'</div>';
 }
 
@@ -2093,9 +2100,11 @@ function homeHtml(){
       +'<div class="hw-orbs"><span class="orb-dot"></span>'+orbs+' <small>orbs</small>'
       +(earnable>0?'<span class="earnable" data-tip="Total orbs from your unclaimed quests">+'+earnable.toLocaleString()+' earnable</span>':'')+'</div>'
       +nameplateRow((eqNp.name)||name,(eqNp.avatar)||(USER&&USER.avatar),eqNp.nameplate,eqNp.nameplateVideo)+'</div>'
-    +'<div class="home-cta"><button class="act primary" onclick="watchAll()">'+ICO.play+'Watch all</button>'
-      +'<button class="act play" onclick="playAll()">'+ICO.play+'Play all</button>'
+    +'<div class="home-cta"><button class="act primary" onclick="startAll()" data-tip="Game quests, then video quests, then badge farming">'+ICO.play+'Start all</button>'
+      +'<button class="act play" onclick="farmToggle()">'+(FARM?'Stop farm':ICO.play+'Badge farm')+'</button>'
       +'<button class="iconbtn hicon" title="Refresh" onclick="rescan()">'+ICO.refresh+'</button></div>'
+    +'<div class="home-cta"><button class="act ghost" onclick="watchAll()">'+ICO.play+'Watch all</button>'
+      +'<button class="act ghost" onclick="playAll()">'+ICO.play+'Play all</button></div>'
     +(STATS?'<div class="hstats-col">'+statTiles()+'</div>':'')
     +'</div>';
   return '<div class="home">'
@@ -2141,9 +2150,9 @@ function render(){
   if(NAV==='shop'){ c.innerHTML=shopHtml(); return; }
   if(NAV==='badges'){ c.innerHTML=badgesHtml(); return; }
   if(NAV==='history'){ c.innerHTML=historyHtml(); return; }
-  if(NAV==='misc'){ c.innerHTML=miscHtml(); return; }
-  if(NAV==='farm'){ const fq=byId('farmQ'), fv=fq?fq.value:'', foc=document.activeElement===fq;
-    c.innerHTML=farmHtml(); const nq=byId('farmQ'); if(nq){ nq.value=fv; farmSearch(); if(foc) nq.focus(); } return; }
+  if(NAV==='farm'){ const st=c.scrollTop, fq=byId('farmQ'), foc=fq&&document.activeElement===fq, sel=fq?fq.selectionStart:0;
+    c.innerHTML=farmHtml(); c.scrollTop=st;
+    const nq=byId('farmQ'); if(nq&&foc){ nq.focus(); try{ nq.setSelectionRange(sel,sel); }catch(e){} } return; }
   if(NAV==='profile'){ const ps=(document.querySelector('.prof-left')||{}).scrollTop||0;
     c.innerHTML=profileHtml(); stuApply(); decorateNameTiles(); setupStuDrag(); fitPreview();
     requestAnimationFrame(function(){ const nl=document.querySelector('.prof-left'); if(nl) nl.scrollTop=ps; });
@@ -2384,7 +2393,7 @@ function stopWatch(keepQueue){
   vid.pause(); vid.removeAttribute('src'); vid.load();
   CUR=null; byId('pill').classList.remove('on'); showDock(false);
   byId('dockStatus').textContent='Idle';
-  if(!keepQueue) autoQueue=[];
+  if(!keepQueue){ autoQueue=[]; START_ALL=null; }
   byId('dockQueue').textContent='';
   render();
 }
@@ -2423,7 +2432,7 @@ function watchAll(){
 function nextAuto(){
   autoQueue=autoQueue.filter(id=>{ const q=QUESTS.find(x=>x.id===id); return q&&!q.completed&&!q.claimed; });
   const id=autoQueue.shift();
-  if(!id){ byId('dockQueue').textContent=''; return; }
+  if(!id){ byId('dockQueue').textContent=''; if(START_ALL==='videos') startAllNext(); return; }
   byId('dockQueue').textContent=autoQueue.length+' queued';
   watch(id,true);
 }
@@ -2440,7 +2449,7 @@ function playGame(id,auto){
   if(!auto) toast('Now mimicking '+q.name+' — it counts while it runs (~'+Math.round((q.target||900)/60)+ ' min)');
   render();
 }
-function stopPlay(){ send('playStop'); CURPLAY=null; playQueue=[]; if(!CUR) byId('pill').classList.remove('on'); render(); }
+function stopPlay(){ send('playStop'); CURPLAY=null; playQueue=[]; START_ALL=null; if(!CUR) byId('pill').classList.remove('on'); render(); }
 function playAll(){
   const g=pendingGames();
   if(!g.length){ toast('No unplayed game quests'); return; }
@@ -2464,116 +2473,133 @@ window.playProgress=function(id,prog,target,done){
 };
 window.playDone=function(id){
   const q=QUESTS.find(x=>x.id===id); if(q){ q.completed=true; onCompleted(q); }
-  if(CURPLAY&&CURPLAY.id===id){ CURPLAY=null; if(!CUR) byId('pill').classList.remove('on'); toast('Finished a game quest — claim it in the Claim tab'); nextPlay(); }
+  if(CURPLAY&&CURPLAY.id===id){ CURPLAY=null; if(!CUR) byId('pill').classList.remove('on'); toast('Finished a game quest — claim it in the Claim tab'); nextPlay(); if(!CURPLAY&&START_ALL==='games') startAllNext(); }
   render();
 };
 window.playError=function(id,msg){ if(CURPLAY&&CURPLAY.id===id) byId('pillTime').textContent='error'; };
 
 /* ====================== badge farm ====================== */
-/* Game Time = one game for hours; Game Variety = rotate through many games.
-   The backend runs a stand-in process named like each game so the Discord
-   client detects it (see farm.rs). */
-let FARM_GAMES=null, FARM_CFG={}, FARM_ERR=null, farmLoading=false, FARM=null, farmPick=null;
+/* One farm: cycle through a list of games N minutes each (Game Variety; all of
+   it also counts toward Game Time), or stay on one game until switched. The
+   backend runs a stand-in process named like each game so the Discord client
+   detects it (see farm.rs). */
+let FARM_GAMES=null, FARM_CFG={}, FARM_ERR=null, farmLoading=false, FARM=null, farmTerm='';
 window.setFarm=function(games,cfg,err){
-  farmLoading=false; FARM_GAMES=games||[]; FARM_CFG=cfg||{}; FARM_ERR=err||null;
+  farmLoading=false; FARM_GAMES=games||[]; if(cfg) FARM_CFG=cfg; FARM_ERR=err||null;
   if(NAV==='farm') render();
 };
+window.setFarmCfg=function(cfg){ if(cfg) FARM_CFG=cfg; if(NAV==='home'||NAV==='history') render(); };
+function farmKey(st){ return st?(st.resting?'rest':'run')+'|'+st.id:''; }
 window.farmStatus=function(st){
-  const before=FARM?FARM.mode+'|'+FARM.id:'';
+  const before=farmKey(FARM);
   if(st&&st.error&&!st.game){ toast(niceError(st.error)); st=null; }
   FARM=st;
-  if(st){ FARM_CFG.total_secs=st.totalSecs; FARM_CFG.played_n=st.played; }
+  if(st&&st.id&&!st.resting){
+    const pg=FARM_CFG.per_game=(FARM_CFG.per_game||{}), e=pg[st.id]=(pg[st.id]||{name:st.game});
+    e.secs=st.gameSecs; FARM_CFG.total_secs=st.totalSecs;
+    if(!(FARM_CFG.played||[]).includes(st.id)) (FARM_CFG.played=FARM_CFG.played||[]).push(st.id);
+  }
   syncAwake();
-  if(NAV!=='farm') return;
-  // Full re-render only when the farm starts/stops/switches game; otherwise just tick the timers.
-  if((FARM?FARM.mode+'|'+FARM.id:'')!==before) render();
-  else ['hours','variety'].forEach(m=>{ const el=byId('farmLive-'+m); if(el) el.innerHTML=farmLive(m); });
+  // Full re-render only when the farm starts/stops/switches; otherwise just tick the numbers.
+  if(farmKey(FARM)!==before){ if(['farm','home'].includes(NAV)) render(); }
+  else if(NAV==='farm') farmTick();
 };
+function farmTick(){
+  const el=byId('farmStatus'); if(el) el.innerHTML=farmNow();
+  const t=byId('farmTot'); if(t) t.innerHTML=farmTotHtml();
+  if(FARM&&FARM.id){ const h=byId('fh-'+FARM.id); if(h) h.textContent=fdur(farmSecs(FARM.id))+' farmed'; }
+}
 function fgame(id){ return (FARM_GAMES||[]).find(g=>g.id===id); }
 function fdur(s){ s=s||0; const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return h? h+'h '+m+'m' : m? m+'m '+x+'s' : x+'s'; }
-function farmSave(extra){ send('farmSave',extra); }
-function farmPopular(){ return (FARM_GAMES||[]).filter(g=>g.pop!=null).slice(0,25); }
-function farmVariety(){
-  if(FARM_CFG.variety_use_custom) return (FARM_CFG.variety_custom||[]).map(fgame).filter(Boolean);
-  return farmPopular();
+function fimg(g,big){ if(!g) return ''; const h=g.cover||g.icon; return h?'https://cdn.discordapp.com/app-icons/'+g.id+'/'+h+'.png?size='+(big?512:128):''; }
+function farmSecs(id){ return ((FARM_CFG.per_game||{})[id]||{}).secs||0; }
+function farmPlayedN(){ return Math.max((FARM_CFG.played||[]).length,Object.keys(FARM_CFG.per_game||{}).length); }
+function farmMins(){ return FARM_CFG.minutes==null?15:FARM_CFG.minutes; }
+function farmCustom(){ return FARM_CFG.custom=(FARM_CFG.custom||[]); }
+function farmList(){
+  if(FARM_CFG.use_custom&&farmCustom().length) return farmCustom().map(fgame).filter(Boolean);
+  return (FARM_GAMES||[]).filter(g=>g.pop!=null).slice(0,25);
 }
-function farmHoursGame(){ return fgame(FARM_CFG.hours_game)||(FARM_GAMES||[])[0]; }
-function farmLive(mode){
-  if(!FARM||FARM.mode!==mode) return mode==='hours'
-    ? 'Not running'
-    : 'Not running · '+farmVariety().length+' games, '+(FARM_CFG.variety_minutes||15)+' min each';
-  const err=FARM.error?' · <span style="color:var(--warn,#f59e0b)">couldn\'t start the stand-in game: '+esc(niceError(FARM.error))+'</span>':'';
-  if(mode==='hours') return 'Playing <b>'+esc(FARM.game)+'</b> for '+fdur(FARM.gameSecs)+err;
-  return 'Playing <b>'+esc(FARM.game)+'</b> ('+(FARM.index+1)+' of '+FARM.count+(FARM.round>1?', round '+FARM.round:'')+') · '
-    +fdur(FARM.gameSecs)+' / '+fdur(FARM.sliceSecs)+err;
-}
-function farmStart(mode){ send('farmStart',{mode:mode}); toast(mode==='hours'?'Farming game hours — leave Aurora running':'Farming game variety — cycling through your games'); }
+function farmSingle(){ return fgame(FARM_CFG.single_game)||farmList()[0]; }
+// Save settings, and restart a running farm so they apply straight away.
+function farmSet(patch,extra){ Object.assign(FARM_CFG,patch); send('farmSave',extra); if(FARM) send('farmStart'); render(); }
+function farmStart(){ send('farmStart'); toast('Badge farm started — leave Aurora running'); }
 function farmStop(){ send('farmStop'); FARM=null; syncAwake(); render(); }
-function farmBtn(mode){
-  const on=FARM&&FARM.mode===mode;
-  return on? '<button class="act ghost farm-btn" onclick="farmStop()">Stop</button>'
-           : '<button class="act primary farm-btn" onclick="farmStart(\''+mode+'\')">'+ICO.play+(FARM?'Switch to this':'Start')+'</button>';
-}
-function farmUseCustom(on){ FARM_CFG.variety_use_custom=on; farmSave({varietyUseCustom:on}); if(on&&!(FARM_CFG.variety_custom||[]).length) farmPick='variety'; render(); }
-function farmMinutes(m){ FARM_CFG.variety_minutes=m; farmSave({varietyMinutes:m}); render(); }
-function farmOpenPick(m){ farmPick=(farmPick===m?null:m); render(); const q=byId('farmQ'); if(q) q.focus(); }
-function farmChoose(id){
-  if(farmPick==='hours'){ FARM_CFG.hours_game=id; farmSave({hoursGame:id}); farmPick=null; toast('Game Time will farm '+((fgame(id)||{}).name||'that game')+(FARM&&FARM.mode==='hours'?' — restart to switch':'')); }
-  else { const l=FARM_CFG.variety_custom=(FARM_CFG.variety_custom||[]);
-    if(l.includes(id)) l.splice(l.indexOf(id),1); else l.push(id);
-    FARM_CFG.variety_use_custom=true; farmSave({varietyCustom:l,varietyUseCustom:true}); }
+function farmToggle(){ if(FARM) farmStop(); else farmStart(); }
+function farmUseCustom(on){ farmSet({use_custom:on},{useCustom:on}); }
+function farmSetMinutes(m){ farmSet({minutes:m},{minutes:m}); }
+function farmSetPause(after,forM){ const p={pause_after_mins:after}; const x={pauseAfter:after};
+  if(forM!=null){ p.pause_for_mins=forM; x.pauseFor=forM; } farmSet(p,x); }
+function farmPickSingle(id){ farmSet({single_game:id,minutes:0},{singleGame:id,minutes:0}); toast('Farming '+((fgame(id)||{}).name||'that game')+' until you switch'); }
+function farmToggleMine(id){
+  const l=farmCustom(), i=l.indexOf(id);
+  if(i>=0) l.splice(i,1); else l.push(id);
+  // Only restart a running farm when it's actually farming this list.
+  send('farmSave',{custom:l}); if(FARM&&FARM_CFG.use_custom&&farmMins()>0) send('farmStart');
+  if(i<0) toast('Added '+((fgame(id)||{}).name||'game')+' to your list');
   render();
 }
-function farmRemove(id){ const l=FARM_CFG.variety_custom||[]; const i=l.indexOf(id); if(i>=0) l.splice(i,1); farmSave({varietyCustom:l}); render(); }
-function farmSearch(){
-  const el=byId('farmResults'); if(!el) return;
-  const t=(byId('farmQ').value||'').trim().toLowerCase();
-  const all=FARM_GAMES||[];
-  const list=(t? all.filter(g=>g.name.toLowerCase().includes(t)) : all.filter(g=>g.pop!=null)).slice(0,60);
-  const picked=farmPick==='hours'? [FARM_CFG.hours_game] : (FARM_CFG.variety_custom||[]);
-  el.innerHTML=list.length? list.map(g=>{ const sel=picked.includes(g.id);
-      return '<div class="farm-ri"><span class="grow">'+esc(g.name)+'</span>'+(g.pop!=null?'<span class="pop">Popular</span>':'')
-        +'<button class="act '+(sel?'primary':'ghost')+'" onclick="farmChoose(\''+g.id+'\')">'+(farmPick==='hours'?(sel?'Selected':'Pick'):(sel?'Added ✓':'Add'))+'</button></div>'; }).join('')
-    : '<div class="farm-ri" style="color:var(--text-mute)">No detectable game matches that name</div>';
+function farmSearch(){ farmTerm=(byId('farmQ').value||'').trim().toLowerCase(); const g=byId('farmGrid'); if(g) g.innerHTML=farmGridInner(); }
+function farmNow(){
+  const n=farmList().length, mins=farmMins();
+  if(!FARM) return mins===0
+    ? 'Not running · will farm <b>'+esc((farmSingle()||{}).name||'—')+'</b> until you switch'
+    : 'Not running · <b>'+n+' games</b>, '+mins+' min each, then round again';
+  if(FARM.resting) return 'Taking a break · resumes <b>'+esc(FARM.game)+'</b> in '+fdur(FARM.restLeft);
+  const err=FARM.error?'<br><span style="color:var(--warn,#f59e0b)">Couldn\'t start the stand-in game: '+esc(niceError(FARM.error))+'</span>':'';
+  return 'Farming <b>'+esc(FARM.game)+'</b> · '+(FARM.single? fdur(FARM.runSecs)+' so far'
+    : 'game '+(FARM.index+1)+' of '+FARM.count+(FARM.round>1?' (round '+FARM.round+')':'')+' · '+fdur(FARM.runSecs)+' / '+fdur(FARM.sliceSecs))+err;
+}
+function farmTotHtml(){ return '<b>'+fdur(FARM_CFG.total_secs||0)+'</b>'+farmPlayedN()+' games farmed'; }
+function farmCard(g){
+  const live=FARM&&FARM.id===g.id, mine=farmCustom().includes(g.id);
+  const single=farmMins()===0, chosen=single&&(farmSingle()||{}).id===g.id;
+  const img=fimg(g,true);
+  const thumb='<div class="thumb'+(g.cover?'':' ficon')+'"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'>'
+    +(live?'<div class="tag" style="color:var(--accent)">'+(FARM.resting?'Paused':'● Farming')+'</div>':(g.pop!=null?'<div class="tag">Popular</div>':''))+'</div>';
+  const acts='<div class="acts">'
+    +(single?'<button class="act '+(chosen?'primary':'ghost')+'" onclick="farmPickSingle(\''+g.id+'\')">'+(chosen?ICO.check+'Selected':'Farm this one')+'</button>':'')
+    +'<button class="act ghost" onclick="farmToggleMine(\''+g.id+'\')">'+(mine?'Remove from my list':'+ My list')+'</button></div>';
+  return '<article class="card fcard'+(live?' live':'')+'">'+thumb+'<div class="body"><div class="name">'+esc(g.name)+'</div>'
+    +'<div class="row" id="fh-'+g.id+'">'+ICO.clock+fdur(farmSecs(g.id))+' farmed</div><div class="grow"></div>'+acts+'</div></article>';
+}
+function farmGridInner(){
+  if(farmTerm){
+    const hits=(FARM_GAMES||[]).filter(g=>g.name.toLowerCase().includes(farmTerm)).slice(0,60);
+    return hits.length? hits.map(farmCard).join('') : '<div class="fhint">No game Discord can detect matches that.</div>';
+  }
+  const l=farmList();
+  return l.length? l.map(farmCard).join('') : '<div class="fhint">Your list is empty. Search above to add games.</div>';
 }
 function farmHtml(){
   if(FARM_GAMES===null){ if(!farmLoading){ farmLoading=true; send('farmLoad'); } return '<div class="mid"><div class="spin"></div><p>Loading Discord\'s game list…</p></div>'; }
   if(!FARM_GAMES.length) return '<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t load Discord\'s game list</h2><p>'+esc(niceError(FARM_ERR||'No games found'))+'</p>'
     +(FARM_ERR?'<p style="font-size:11.5px;opacity:.7">'+esc((''+FARM_ERR).slice(0,200))+'</p>':'')
     +'<button class="act ghost farm-btn" onclick="FARM_GAMES=null;render()">Try again</button></div>';
-  const hg=farmHoursGame(), custom=!!FARM_CFG.variety_use_custom, mins=FARM_CFG.variety_minutes||15;
-  const vlist=farmVariety();
-  const chips=vlist.length? vlist.map(g=>'<span class="farm-g">'+esc(g.name)+(custom?'<button title="Remove" onclick="farmRemove(\''+g.id+'\')">✕</button>':'')+'</span>').join('')
-    : '<span class="farm-live">Your list is empty — add some games.</span>';
-  const picker=farmPick? '<div class="sgroup"><h3>'+(farmPick==='hours'?'Pick the Game Time game':'Add games to your Variety list')+'</h3>'
-      +'<div class="srow"><div class="ctl search" style="flex:1"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>'
-      +'<input id="farmQ" placeholder="Search '+FARM_GAMES.length.toLocaleString()+' games Discord can detect" oninput="farmSearch()" spellcheck="false"></div>'
-      +'<button class="act ghost farm-btn" onclick="farmOpenPick(null)">Done</button></div>'
-      +'<div class="farm-res" id="farmResults"></div></div>' : '';
-  const hours='<div class="sgroup"><h3>Game Time</h3>'
-     +'<div class="srow"><div class="txt"><div class="t">Farm game hours</div><div class="d">Runs one game for as long as you leave it on, so the hours count toward your Game Time badge.</div></div></div>'
-     +'<div class="srow"><div class="txt"><div class="t">'+esc(hg?hg.name:'—')+'</div><div class="d">'+(FARM_CFG.hours_game?'Your pick':'Most popular game')+'</div></div>'
-       +'<button class="act ghost farm-btn" onclick="farmOpenPick(\'hours\')">Change</button></div>'
-     +'<div class="srow"><div class="txt farm-live" id="farmLive-hours">'+farmLive('hours')+'</div>'+farmBtn('hours')+'</div>'
-   +'</div>';
-  const variety='<div class="sgroup"><h3>Game Variety</h3>'
-     +'<div class="srow"><div class="txt"><div class="t">Farm game variety</div><div class="d">Cycles through lots of different games, a few minutes each, so each one counts toward your Game Variety badge. Keeps looping until you stop it.</div></div></div>'
-     +'<div class="srow"><div class="txt"><div class="t">Games</div><div class="d">Popular picks automatically, or your own list.</div></div><div class="chips">'
-       +'<button class="chip'+(!custom?' on':'')+'" onclick="farmUseCustom(false)">Popular</button>'
-       +'<button class="chip'+(custom?' on':'')+'" onclick="farmUseCustom(true)">My list</button></div></div>'
-     +'<div class="farm-list">'+chips+(custom?'<button class="chip" onclick="farmOpenPick(\'variety\')">+ Add games</button>':'')+'</div>'
-     +'<div class="srow"><div class="txt"><div class="t">Minutes per game</div></div><div class="chips">'
-       +[5,10,15,30].map(m=>'<button class="chip'+(mins===m?' on':'')+'" onclick="farmMinutes('+m+')">'+m+'</button>').join('')+'</div></div>'
-     +'<div class="srow"><div class="txt farm-live" id="farmLive-variety">'+farmLive('variety')+'</div>'+farmBtn('variety')+'</div>'
-   +'</div>';
-  const side='<div class="set-side"><div class="patch"><div class="patch-h"><h3>Farmed so far</h3></div>'
-      +'<div class="srow" style="padding:10px 2px"><div class="txt"><div class="t">'+fdur(FARM_CFG.total_secs||0)+'</div><div class="d">Total time farmed</div></div></div>'
-      +'<div class="srow" style="padding:10px 2px"><div class="txt"><div class="t">'+(FARM_CFG.played_n||(FARM_CFG.played||[]).length)+'</div><div class="d">Different games played</div></div></div></div>'
-    +'<div class="patch"><div class="patch-h"><h3>How it works</h3></div><div class="srow" style="padding:8px 2px"><div class="d">'
-      +'Discord needs to be open on this PC: Aurora starts a small stand-in program named like the game, and your Discord client picks it up as that game. '
-      +'One farm runs at a time, separately from quest games. Discord decides how badge progress is counted, so it may take a while to show.'
-    +'</div></div></div></div>';
-  return '<div class="settings2"><div class="settings">'+picker+hours+variety+'</div>'+side+'</div>';
+  const custom=!!FARM_CFG.use_custom, mins=farmMins(), pa=FARM_CFG.pause_after_mins||0, pf=FARM_CFG.pause_for_mins||60;
+  const chip=(on,label,fn)=>'<button class="chip'+(on?' on':'')+'" onclick="'+fn+'">'+label+'</button>';
+  const head='<div class="farm-head"><div class="farm-now" id="farmStatus">'+farmNow()+'</div>'
+    +'<div class="farm-tot" id="farmTot">'+farmTotHtml()+'</div>'
+    +(FARM?'<button class="act ghost" onclick="farmStop()">Stop farm</button>':'<button class="act primary" onclick="farmStart()">'+ICO.play+'Start farm</button>')+'</div>';
+  const ctl='<div class="farm-ctl">'
+    +'<div class="grp"><span>Games</span>'+chip(!custom,'Popular','farmUseCustom(false)')+chip(custom,'My list ('+farmCustom().length+')','farmUseCustom(true)')+'</div>'
+    +'<div class="grp"><span>Per game</span>'+[5,10,15,30].map(m=>chip(mins===m,m+'m','farmSetMinutes('+m+')')).join('')+chip(mins===0,'One game','farmSetMinutes(0)')+'</div>'
+    +'<div class="grp"><span>Breaks</span>'+chip(!pa,'Off','farmSetPause(0)')+[60,120,240].map(m=>chip(pa===m,'every '+(m/60)+'h','farmSetPause('+m+')')).join('')
+      +(pa?' <span>for</span>'+[15,30,60,120].map(m=>chip(pf===m,m<60?m+'m':(m/60)+'h','farmSetPause('+pa+','+m+')')).join(''):'')+'</div>'
+    +'<div class="ctl search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>'
+      +'<input id="farmQ" value="'+esc(farmTerm)+'" placeholder="Search '+FARM_GAMES.length.toLocaleString()+' games to add" oninput="farmSearch()" spellcheck="false"></div>'
+    +'</div>';
+  const hint=mins===0?'<div class="fhint">One game mode: pick the game to farm with “Farm this one”. It runs until you pick another or stop.</div>':'';
+  return head+ctl+hint+'<div class="grid" id="farmGrid">'+farmGridInner()+'</div>';
+}
+
+/* Start all: game quests, then video quests, then the badge farm. */
+let START_ALL=null;
+function startAll(){ START_ALL='games'; toast('Starting everything: game quests, then videos, then badge farming'); startAllNext(); }
+function startAllNext(){
+  if(START_ALL==='games'){ if(pendingGames().length){ if(!CURPLAY) playAll(); return; } START_ALL='videos'; }
+  if(START_ALL==='videos'){ if(pendingVideos().length){ if(!CUR) watchAll(); return; } START_ALL='farm'; }
+  if(START_ALL==='farm'){ START_ALL=null; if(!FARM) farmStart(); }
 }
 
 /* ====================== claiming ====================== */
