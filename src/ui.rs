@@ -1055,6 +1055,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.5',d:'21 Oct 2026',notes:[
+    'Fixed the Badge Farm tab failing with "Couldn\'t load Discord\'s game list" — Discord\'s list is bigger than the old download limit',
+  ]},
   {v:'0.5.4',d:'21 Oct 2026',notes:[
     'New Badge Farm tab: Game Time runs one game for as long as you like to build up hours, and Game Variety cycles through lots of different games (popular picks or your own list from every game Discord can detect). Discord needs to be open on this PC.',
   ]},
@@ -2536,6 +2539,7 @@ function farmSearch(){
 function farmHtml(){
   if(FARM_GAMES===null){ if(!farmLoading){ farmLoading=true; send('farmLoad'); } return '<div class="mid"><div class="spin"></div><p>Loading Discord\'s game list…</p></div>'; }
   if(!FARM_GAMES.length) return '<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t load Discord\'s game list</h2><p>'+esc(niceError(FARM_ERR||'No games found'))+'</p>'
+    +(FARM_ERR?'<p style="font-size:11.5px;opacity:.7">'+esc((''+FARM_ERR).slice(0,200))+'</p>':'')
     +'<button class="act ghost farm-btn" onclick="FARM_GAMES=null;render()">Try again</button></div>';
   const hg=farmHoursGame(), custom=!!FARM_CFG.variety_use_custom, mins=FARM_CFG.variety_minutes||15;
   const vlist=farmVariety();
