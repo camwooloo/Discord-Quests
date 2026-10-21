@@ -78,6 +78,13 @@ fn main() -> wry::Result<()> {
         stream::run_window();
         return Ok(());
     }
+    if args.iter().any(|a| a == "--voice") {
+        // Debug: print what the streaming area would show, after the gateway settles.
+        stream::watch(|| token::find_token().unwrap_or_default(), |_| {});
+        std::thread::sleep(std::time::Duration::from_secs(15));
+        println!("{:#}", stream::snapshot());
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--list") {
         run_cli();
         return Ok(());
