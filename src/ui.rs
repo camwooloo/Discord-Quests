@@ -1037,6 +1037,10 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.2',d:'21 Oct 2026',notes:[
+    'Account Age, Streaming, Game Time & Game Variety badges are live on Discord now — the Badges tab reads your real tier and lights the ladder up to it, with the tier name under your badge',
+    'Renamed Game Depth → Game Time and Game Diversity → Game Variety to match the Discord client',
+  ]},
   {v:'0.5.1',d:'13 Oct 2026',notes:[
     'New "Keep device awake" setting: while a video or game quest is running, your laptop won\'t drift off to sleep and interrupt it. Off by default — turn it on in Settings › Automation.',
   ]},
@@ -1440,8 +1444,8 @@ function nameFor(id){
   if(m[id]) return m[id];
   if(id.startsWith('guild_booster')) return 'Server Booster';
   if(id.startsWith('premium_tenure')||id==='premium') return 'Discord Nitro';
-  if(id.includes('game_depth')||id.includes('game_time')) return 'Game Depth';
-  if(id.includes('game_diversity')||id.includes('game_variety')) return 'Game Diversity';
+  if(id.includes('game_depth')||id.includes('game_time')) return 'Game Time';
+  if(id.includes('game_diversity')||id.includes('game_variety')) return 'Game Variety';
   if(id.includes('account_age')) return 'Account Age';
   if(id.includes('stream')) return 'Streaming';
   return id.replace(/_v?\d*$/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
@@ -1451,8 +1455,12 @@ function ageYears(){ if(!BADGES||!BADGES.createdMs) return 0; return (NOW()-BADG
 function NOW(){ return Date.now(); }
 function realTile(b,extra,locked){
   const nm=nameFor(b.id);
+  // Tiered badges fall back to the embedded tier icon if the CDN image fails.
+  const f=TIERED.find(f=>f.match(b)), local=f?BADGE_IMGS[f.img+badgeTier(f,b)]:null;
+  const fb=local?'this.onerror=null;this.src=\''+local+'\'':'this.parentElement.innerHTML=\'🏅\'';
+  if(f&&!extra) extra=f.tiers[badgeTier(f,b)-1][0];
   return '<div class="btile'+(locked?' locked':'')+'" data-tip="'+esc(b.description||nm)+(locked?' · Locked':'')+'">'
-    +'<div class="bimg"><img src="'+badgeSrc(b)+'" alt="" onerror="this.parentElement.innerHTML=\'🏅\'"></div>'
+    +'<div class="bimg"><img src="'+badgeSrc(b)+'" alt="" onerror="'+fb+'"></div>'
     +'<div class="bnm">'+esc(nm)+'</div>'+(extra?'<div class="bsub">'+esc(extra)+'</div>':'')+'</div>';
 }
 // Classic badges (known icon hashes) for the locked showcase.
@@ -1482,17 +1490,39 @@ function giftCurrentTier(){
   for(let i=GIFT_TIERS.length-1;i>=0;i--) if(d.includes(GIFT_TIERS[i][0].toLowerCase())) return i+1;
   return 1; // has the badge but tier name not found
 }
-// The evolving Account Age / Game Variety / Game Time / Streaming badges (rolling
-// out from Discord). Detect the earned badge by id keyword or a tier-name match,
-// then read its current tier so the ladder lights up with the real icon.
-function familyTier(tiers,idHints){
-  const bs=earnedBadges();
-  let b=bs.find(x=>idHints.some(h=>(x.id||'').toLowerCase().includes(h)));
-  if(!b) b=bs.find(x=>tiers.some(t=>(x.description||'').toLowerCase().includes(t[0].toLowerCase())));
-  if(!b) return {tier:0,badge:null};
-  const d=((b.description||'')+' '+(b.id||'')).toLowerCase();
-  for(let i=tiers.length-1;i>=0;i--) if(d.includes(tiers[i][0].toLowerCase())) return {tier:i+1,badge:b};
-  return {tier:1,badge:b};
+// Discord's tiered Account Age / Streaming / Game Time / Game Variety badges.
+// The profile API only gives us an id, description and icon for the tier the
+// user is on, so match the family loosely (id keyword, or a whole-word tier name
+// in the description) and read the tier from the tier name, the id's trailing
+// number, or the amount in the description, in that order.
+const TIERED=[
+  {key:'age',title:'Account Age',emoji:'🌳',tiers:AGE_TIERS,img:'account_age_',hints:['account_age','account-age'],
+   unlock:'Keep your Discord account for 1 year to unlock this badge.'},
+  {key:'stream',title:'Streaming',emoji:'📹',tiers:STREAM_TIERS,img:'streaming_tier_',hints:['stream'],
+   unlock:'Stream for 1 hour to other users to unlock this badge.'},
+  {key:'time',title:'Game Time',emoji:'⏱️',tiers:TIME_TIERS,img:'game_depth_tier_',hints:['game_time','game_depth','playtime'],
+   unlock:'Play detectable PC games with Discord open for 1 hour to unlock this badge.'},
+  {key:'variety',title:'Game Variety',emoji:'🎮',tiers:VARIETY_TIERS,img:'game_diversity_tier_',hints:['game_variety','game_diversity'],
+   unlock:'Play 2 detectable PC games with Discord open to unlock this badge.'},
+];
+const wordIn=(txt,w)=>new RegExp('\\b'+w+'\\b','i').test(txt||'');
+TIERED.forEach(f=>{
+  f.need=f.tiers.map(t=>parseInt(t[1].replace(/,/g,''),10));
+  f.match=b=>{ const id=(b&&b.id||'').toLowerCase();
+    return f.hints.some(h=>id.includes(h))||(!!b&&f.tiers.some(t=>wordIn(b.description,t[0]))&&!/gift/i.test(id)); };
+});
+function badgeTier(f,b){
+  const d=(b.description||'');
+  for(let i=f.tiers.length-1;i>=0;i--) if(wordIn(d,f.tiers[i][0])) return i+1;
+  const m=(b.id||'').match(/(\d+)$/); if(m){ const n=+m[1]; if(n>=1&&n<=f.tiers.length) return n; }
+  const unit=f.key==='age'?'year':f.key==='variety'?'game':'hour';
+  const a=d.replace(/,/g,'').match(new RegExp('(\\d+)\\+?\\s*'+unit,'i'));
+  if(a){ const n=+a[1]; let t=1; f.need.forEach((v,i)=>{ if(n>=v) t=i+1; }); return t; }
+  return 1;
+}
+function familyTier(f){
+  const b=earnedBadges().find(f.match);
+  return b?{tier:badgeTier(f,b),badge:b}:{tier:0,badge:null};
 }
 function tierFamily(title,emoji,intro,tiers,achievedCount,realIcon,imgPrefix){
   const tiles=tiers.map((t,i)=>{
@@ -1522,18 +1552,17 @@ function badgesHtml(){
      +(owned.length?owned.map(b=>realTile(b)).join(''):'<div class="hempty">No profile badges yet.</div>')+'</div></div>';
 
   const giftBadge=earnedBadges().find(b=>b.id==='gifting');
-  const age=familyTier(AGE_TIERS,['account_age','account age']);
-  const diversity=familyTier(VARIETY_TIERS,['game_diversity','diversity','game_variety','variety']);
-  const depth=familyTier(TIME_TIERS,['game_depth','depth','game_time','playtime']);
-  const stream=familyTier(STREAM_TIERS,['stream']);
-  const ageT=age.tier||ageDone; // fall back to computed age if the badge isn't rolled out yet
-  const rolling='Discord is rolling this badge out — it lights up here automatically once it reaches your profile.';
   out+=tierFamily('Gift Giver','🎁', giftDone? 'You\'ve reached tier '+giftDone+' of 6 — send more gifts to evolve it.' : 'Send Nitro gifts to earn this evolving badge.', GIFT_TIERS, giftDone, giftBadge?badgeSrc(giftBadge):null);
-  out+=tierFamily('Account Age','🌳', age.tier? ('Tier '+age.tier+' of 10.') : ('Your account is ~'+Math.floor(ay)+' years old (tier '+ageDone+'). '+rolling), AGE_TIERS, ageT, age.badge?badgeSrc(age.badge):null, 'account_age_');
-  out+=tierFamily('Game Diversity','🎮', diversity.tier? ('Tier '+diversity.tier+' of 10.') : ('Play a wider range of detectable games with Discord open. '+rolling), VARIETY_TIERS, diversity.tier, diversity.badge?badgeSrc(diversity.badge):null, 'game_diversity_tier_');
-  out+=tierFamily('Game Depth','⏱️', depth.tier? ('Tier '+depth.tier+' of 10.') : ('Play more hours of detectable PC games. '+rolling), TIME_TIERS, depth.tier, depth.badge?badgeSrc(depth.badge):null, 'game_depth_tier_');
-  out+=tierFamily('Streaming','📹', stream.tier? ('Tier '+stream.tier+' of 10.') : ('Stream more hours to other users. '+rolling), STREAM_TIERS, stream.tier, stream.badge?badgeSrc(stream.badge):null, 'streaming_tier_');
-
+  TIERED.forEach(f=>{
+    const r=familyTier(f);
+    // Account Age can be worked out from the account's creation date even
+    // before the badge itself shows up on the profile.
+    const t=r.tier||(f.key==='age'?ageDone:0);
+    const intro=r.tier? ('You\'re on '+f.tiers[t-1][0]+' — tier '+t+' of 10.'+(t<10?' Next: '+f.tiers[t][0]+' at '+f.tiers[t][1]+'.':''))
+      : f.key==='age'&&t? ('Your account is ~'+Math.floor(ay)+' years old, which is '+f.tiers[t-1][0]+' (tier '+t+' of 10).')
+      : ('Not unlocked yet. '+f.unlock);
+    out+=tierFamily(f.title,f.emoji,intro,f.tiers,t,r.badge?badgeSrc(r.badge):null,f.img);
+  });
   out+='<div class="bsec"><div class="bsec-h">Locked <span>'+locked.length+'</span></div><div class="bgrid">'
      +locked.map(d=>realTile({id:d.id,icon:d.icon,description:CLASSIC_DESC[d.id]},'',true)).join('')+'</div></div>';
   return out+'</div>';
