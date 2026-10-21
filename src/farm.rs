@@ -360,7 +360,10 @@ pub fn run_stub(title: &str, image: &str) {
         .with_inner_size(LogicalSize::new(w, h))
         .with_decorations(false)
         .with_resizable(false)
-        .with_focused(false);
+        .with_focused(false)
+        // Built hidden and shown by show_quietly, so it never steals focus
+        // from (or pops over) a game the user is playing.
+        .with_visible(false);
     let Ok(window) = builder.build(&event_loop) else {
         // No window possible: still idle so the process at least exists.
         loop {
@@ -376,13 +379,57 @@ pub fn run_stub(title: &str, image: &str) {
         ));
     }
     let html = stub_html(title, image);
-    let _webview = wry::WebViewBuilder::new().with_html(html).build(&window);
+    let _webview = wry::WebViewBuilder::new()
+        .with_html(html)
+        .with_focused(false)
+        .build(&window);
+    show_quietly(&window);
     event_loop.run(move |event, _, flow| {
         *flow = ControlFlow::Wait;
         if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = event {
             std::process::exit(0);
         }
     });
+}
+
+/// Show the card without taking focus: put it at the bottom of the window
+/// stack, let Discord's scan see it, then minimise it (still without
+/// activating), so it never pops over or tabs the user out of a game. Detection
+/// survives the minimise. `AURORA_STUB_SHOW=corner` leaves it showing.
+#[cfg(windows)]
+fn show_quietly(window: &tao::window::Window) {
+    use tao::platform::windows::WindowExtWindows;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, ShowWindow, HWND_BOTTOM, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+        SW_SHOWMINNOACTIVE,
+    };
+    let raw = window.hwnd();
+    unsafe {
+        let _ = SetWindowPos(
+            HWND(raw as _),
+            HWND_BOTTOM,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        );
+    }
+    if std::env::var("AURORA_STUB_SHOW").as_deref() == Ok("corner") {
+        return;
+    }
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(15));
+        unsafe {
+            let _ = ShowWindow(HWND(raw as _), SW_SHOWMINNOACTIVE);
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn show_quietly(window: &tao::window::Window) {
+    window.set_visible(true);
 }
 
 /// The stand-in's card: game art behind an Aurora banner.
