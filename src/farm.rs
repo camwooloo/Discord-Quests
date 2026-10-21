@@ -323,6 +323,10 @@ pub fn plan(cfg: &Config, all: &[Game]) -> Vec<Game> {
         let chosen = all.iter().find(|g| g.id == cfg.single_game).cloned();
         return chosen.or_else(|| list.into_iter().next()).into_iter().collect();
     }
+    // Least-farmed first, so each start spreads time across the list instead
+    // of always beginning with the same game. Stable: ties keep list order.
+    let mut list = list;
+    list.sort_by_key(|g| cfg.per_game.get(&g.id).map(|s| s.secs).unwrap_or(0));
     list
 }
 
@@ -736,6 +740,20 @@ mod tests {
         assert_eq!(plan(&cfg, &all).iter().map(|g| g.id.as_str()).collect::<Vec<_>>(), ["c"]);
         cfg.single_game = "b".into();
         assert_eq!(plan(&cfg, &all)[0].id, "b");
+    }
+
+    #[test]
+    fn plan_starts_with_least_farmed() {
+        let g = |id: &str, rank| Game {
+            id: id.into(), name: id.into(), exe: "x.exe".into(), rank, icon: None, cover: None,
+        };
+        let all = vec![g("a", Some(0)), g("b", Some(1)), g("c", Some(2))];
+        let mut cfg = Config::default();
+        for (id, secs) in [("a", 900), ("c", 60)] {
+            cfg.per_game.insert(id.into(), GameStat { secs, ..Default::default() });
+        }
+        let order: Vec<_> = plan(&cfg, &all).into_iter().map(|g| g.id).collect();
+        assert_eq!(order, ["b", "c", "a"]);
     }
 
     #[test]

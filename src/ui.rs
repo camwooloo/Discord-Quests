@@ -174,6 +174,7 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .tb-spacer{flex:1}
 .orb-dot{width:15px;height:15px;border-radius:50%;flex:none;
   background:radial-gradient(circle at 34% 30%,#efe6ff,var(--accent));box-shadow:0 0 10px rgba(var(--accent-rgb),.75)}
+.orbimg .orb-dot{border-radius:0;background:var(--orb-img) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 0 5px rgba(var(--accent-rgb),.45))}
 
 /* dropdown */
 .dd{position:relative}
@@ -770,6 +771,11 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .farm-stream .act{width:auto;height:38px;padding:0 16px;flex:none;font-size:12.5px}
 .farm-stream .shint{flex-basis:100%;font-size:12.5px;color:var(--text-mute);font-weight:550;line-height:1.5}
 .farm-rows{display:flex;flex-direction:column;gap:6px}
+.farm-az{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:4px;padding:8px 0 10px;background:var(--bg-1)}
+.farm-az .chip{height:30px;min-width:28px;padding:0 7px;justify-content:center}
+.farm-az .chip:disabled{opacity:.35;pointer-events:none}
+.farm-sec{padding:2px 2px 6px;font-weight:700}
+img.hist-ic{object-fit:cover}
 .farm-row{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke)}
 .farm-row:hover{background:var(--glass-2)}
 .farm-row .n{flex:1;min-width:0;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1073,6 +1079,11 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.3',d:'21 Oct 2026',notes:[
+    'Badge farming now starts with the games you\'ve farmed least, so it doesn\'t begin with the same game every time',
+    'The game list is split into Popular and A–Z sections, and every game in each section loads as you scroll',
+    'New orb icon',
+  ]},
   {v:'0.6.2',d:'21 Oct 2026',notes:[
     'Streaming badge: a new streaming area on the Badge Farm page shows which voice channel you\'re in and whether you\'re live, and counts your streamed time',
     'Open stream window starts a separate 720p Aurora window to share with Go Live. It shows the game being farmed and keeps running when the farm switches games',
@@ -1343,6 +1354,7 @@ function connBlock(){
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
 window.setVersion=function(v){ ACK=true; APP_VERSION=v||''; maybeChangelog(); };
 window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); };
+window.setOrbImg=function(uri){ if(uri) document.documentElement.classList.add('orbimg'), document.documentElement.style.setProperty('--orb-img','url("'+uri+'")'); };
 window.setLogo=function(uri){ const m=byId('railMark'); if(m&&uri) m.innerHTML='<img src="'+uri+'" alt="Aurora">'; };
 window.noUpdate=function(){ toast('You\'re on the latest version'); };
 // Show the changelog once after an update (last-seen version differs from now).
@@ -2583,7 +2595,7 @@ function farmRowToggle(id,btn){
 }
 function farmRow(g){
   const mine=farmCustom().includes(g.id), img=g.icon?'https://cdn.discordapp.com/app-icons/'+g.id+'/'+g.icon+'.png?size=64':'', secs=farmSecs(g.id);
-  return '<div class="farm-row"><span class="hist-ic"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'></span>'
+  return '<div class="farm-row">'+(img?'<img class="hist-ic" loading="lazy" alt="" src="'+esc(img)+'">':'<span class="hist-ic"></span>')
     +'<span class="n">'+esc(g.name)+'</span>'+(g.pop!=null?'<span class="pop">Popular</span>':'')+(secs?'<span class="h">'+fdur(secs)+'</span>':'')
     +'<button class="act '+(mine?'primary':'ghost')+'" onclick="farmRowToggle(\''+g.id+'\',this)">'+(mine?ICO.check+'Added':'+ Add')+'</button></div>';
 }
@@ -2610,11 +2622,38 @@ function farmCard(g){
   return '<article class="card fcard'+(live?' live':'')+'">'+thumb+'<div class="body"><div class="name">'+esc(g.name)+'</div>'
     +'<div class="row" id="fh-'+g.id+'">'+ICO.clock+fdur(farmSecs(g.id))+' farmed</div><div class="grow"></div>'+acts+'</div></article>';
 }
+/* Browse list: Popular, then A–Z sections. Rows render in chunks as you scroll. */
+let farmSec='pop', farmShown=0, FARM_SECS=null, FARM_SECS_OF=null;
+const FARM_CHUNK=250, FARM_KEYS=['pop'].concat('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),['#']);
+function farmSections(){
+  if(FARM_SECS_OF===FARM_GAMES&&FARM_SECS) return FARM_SECS;
+  const secs={}; FARM_KEYS.forEach(k=>secs[k]=[]);
+  const cmp=new Intl.Collator(undefined,{sensitivity:'base',numeric:true}).compare;
+  (FARM_GAMES||[]).slice().sort((a,b)=>cmp(a.name,b.name)).forEach(g=>{
+    const c=(g.name.normalize('NFD')[0]||'').toUpperCase();
+    secs[c>='A'&&c<='Z'?c:'#'].push(g);
+  });
+  secs.pop=(FARM_GAMES||[]).filter(g=>g.pop!=null).sort((a,b)=>a.pop-b.pop);
+  FARM_SECS=secs; FARM_SECS_OF=FARM_GAMES; return secs;
+}
+function farmBrowseList(){ return farmTerm?(FARM_GAMES||[]).filter(g=>g.name.toLowerCase().includes(farmTerm)):farmSections()[farmSec]; }
+function farmPickSec(k){ farmSec=k; farmFillGrid(); const g=byId('farmGrid'); if(g) g.scrollIntoView({block:'start'}); }
+function farmMore(){
+  const c=byId('content'), g=byId('farmGrid');
+  if(NAV!=='farm'||!g||!(farmBrowse||farmTerm)||c.scrollTop+c.clientHeight<c.scrollHeight-600) return;
+  const l=farmBrowseList(); if(farmShown>=l.length) return;
+  const m=byId('farmMoreHint'); if(m) m.remove();
+  g.insertAdjacentHTML('beforeend',l.slice(farmShown,farmShown+FARM_CHUNK).map(farmRow).join('')); farmShown+=FARM_CHUNK;
+}
+byId('content').addEventListener('scroll',farmMore,{passive:true});
 function farmGridInner(){
   if(farmBrowse||farmTerm){
-    const all=FARM_GAMES||[], hits=farmTerm?all.filter(g=>g.name.toLowerCase().includes(farmTerm)):all, shown=hits.slice(0,200);
-    if(!shown.length) return '<div class="fhint">No game Discord can detect matches that.</div>';
-    return shown.map(farmRow).join('')+(hits.length>shown.length?'<div class="fhint">Showing '+shown.length+' of '+hits.length.toLocaleString()+' — type to narrow it down.</div>':'');
+    const l=farmBrowseList(); farmShown=FARM_CHUNK;
+    const bar=farmTerm?'':'<div class="farm-az">'+FARM_KEYS.map(k=>{ const n=farmSections()[k].length;
+      return '<button class="chip'+(k===farmSec?' on':'')+'"'+(n?'':' disabled')+' onclick="farmPickSec(\''+k+'\')">'+(k==='pop'?'Popular':k)+'</button>'; }).join('')+'</div>';
+    const head='<div class="fhint farm-sec">'+(farmTerm?l.length.toLocaleString()+' games match':(farmSec==='pop'?'Popular':farmSec==='#'?'Numbers and symbols':farmSec)+' · '+l.length.toLocaleString()+' games')+'</div>';
+    if(!l.length) return bar+'<div class="fhint">No game Discord can detect matches that.</div>';
+    return bar+head+l.slice(0,farmShown).map(farmRow).join('');
   }
   const l=farmList();
   return l.length? l.map(farmCard).join('') : '<div class="fhint">Your list is empty. Search above to add games.</div>';
