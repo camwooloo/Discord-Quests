@@ -12,6 +12,7 @@ mod platform;
 mod quests;
 mod settings;
 mod stats;
+mod stream;
 mod studio;
 mod update;
 mod token;
@@ -70,6 +71,18 @@ fn main() -> wry::Result<()> {
         let title = args.get(i + 1).map(String::as_str).unwrap_or("Game");
         let image = args.get(i + 2).map(String::as_str).unwrap_or("");
         farm::run_stub(title, image);
+        return Ok(());
+    }
+    // Separate window the user shares with Go Live for the streaming badge.
+    if args.iter().any(|a| a == "--stream-window") {
+        stream::run_window();
+        return Ok(());
+    }
+    if args.iter().any(|a| a == "--voice") {
+        // Debug: print what the streaming area would show, after the gateway settles.
+        stream::watch(|| token::find_token().unwrap_or_default(), |_| {});
+        std::thread::sleep(std::time::Duration::from_secs(15));
+        println!("{:#}", stream::snapshot());
         return Ok(());
     }
     if args.iter().any(|a| a == "--list") {
@@ -464,6 +477,38 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             if let Some(stop) = ctx.farmer.lock().unwrap().take() {
                 stop.store(true, Ordering::SeqCst);
                 ctx.presence.clear();
+            }
+        }
+        "voiceWatch" => {
+            // Farm page opened: follow the user's voice state from now on.
+            let p = proxy.clone();
+            stream::watch(|| token::find_token().unwrap_or_default(), move |st| {
+                let _ = p.send_event(UserEvent::Eval(format!("window.setVoice({st})")));
+            });
+            let st = stream::snapshot();
+            let _ = proxy.send_event(UserEvent::Eval(format!("window.setVoice({st})")));
+        }
+        "streamOpen" | "streamClose" => {
+            let res = if v["type"] == "streamOpen" {
+                stream::open_window()
+            } else {
+                stream::close_window();
+                Ok(())
+            };
+            let mut st = stream::snapshot();
+            if let Err(e) = res {
+                st["error"] = Value::from(e);
+            }
+            let _ = proxy.send_event(UserEvent::Eval(format!("window.setVoice({st})")));
+        }
+        "voiceOpen" => {
+            // Take the Discord client to a voice channel; they press Join there.
+            let ok = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+            let (g, c) = (v["guild"].as_str().unwrap_or(""), v["channel"].as_str().unwrap_or(""));
+            if ok(g) && ok(c) {
+                let _ = proxy.send_event(UserEvent::OpenExternal(format!(
+                    "discord://-/channels/{g}/{c}"
+                )));
             }
         }
         "saveImage" => {

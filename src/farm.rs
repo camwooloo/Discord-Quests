@@ -341,17 +341,7 @@ pub fn run_stub(title: &str, image: &str) {
     use tao::event_loop::{ControlFlow, EventLoop};
     use tao::window::WindowBuilder;
 
-    std::thread::spawn(|| {
-        use std::io::Read;
-        let mut buf = [0u8; 64];
-        let mut stdin = std::io::stdin();
-        while let Ok(n) = stdin.read(&mut buf) {
-            if n == 0 {
-                break;
-            }
-        }
-        std::process::exit(0);
-    });
+    exit_with_parent();
 
     let event_loop = EventLoop::new();
     let (w, h) = (340.0, 190.0);
@@ -390,6 +380,31 @@ pub fn run_stub(title: &str, image: &str) {
             std::process::exit(0);
         }
     });
+}
+
+/// Quit when Aurora goes away: it holds our stdin pipe, which closes when it
+/// exits (or kills us), so a crash never leaves helper windows behind.
+pub fn exit_with_parent() {
+    std::thread::spawn(|| {
+        use std::io::Read;
+        let mut buf = [0u8; 64];
+        let mut stdin = std::io::stdin();
+        while let Ok(n) = stdin.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+        }
+        std::process::exit(0);
+    });
+}
+
+/// Discord CDN art for a game (cover, else icon), or "" if it has none.
+pub fn art_url(game: &Game) -> String {
+    game.cover
+        .as_ref()
+        .or(game.icon.as_ref())
+        .map(|h| format!("https://cdn.discordapp.com/app-icons/{}/{h}.png?size=512", game.id))
+        .unwrap_or_default()
 }
 
 /// Show the card without taking focus: put it at the bottom of the window
@@ -495,12 +510,7 @@ fn spawn_stub(game: &Game) -> Result<Child, String> {
         }
     }
     let mut cmd = Command::new(&target);
-    let image = game
-        .cover
-        .as_ref()
-        .or(game.icon.as_ref())
-        .map(|h| format!("https://cdn.discordapp.com/app-icons/{}/{h}.png?size=512", game.id))
-        .unwrap_or_default();
+    let image = art_url(game);
     cmd.arg("--farm-stub")
         .arg(&game.name)
         .arg(image)
@@ -565,6 +575,7 @@ pub fn run(
         if crate::settings::load().show_presence {
             presence.set(&game.name, &game.id);
         }
+        crate::stream::set_now(Some(game));
         if !cfg.played.contains(&game.id) {
             cfg.played.push(game.id.clone());
         }
@@ -621,6 +632,7 @@ pub fn run(
                     flush(&mut cfg, &mut unsaved);
                     kill(&mut child);
                     presence.clear();
+                    crate::stream::set_now(None);
                     let rest_start = Instant::now();
                     while rest_start.elapsed() < rest {
                         if stop.load(Ordering::SeqCst) {
@@ -644,6 +656,7 @@ pub fn run(
                     if crate::settings::load().show_presence {
                         presence.set(&game.name, &game.id);
                     }
+                    crate::stream::set_now(Some(game));
                     tick = 0;
                     continue;
                 }
@@ -664,6 +677,7 @@ pub fn run(
             round += 1;
         }
     }
+    crate::stream::set_now(None);
     // Presence is cleared by whoever stopped us (farmStop), so a farm that's
     // being replaced doesn't wipe its successor's game.
     status(Value::Null);
