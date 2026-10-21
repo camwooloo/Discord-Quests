@@ -759,6 +759,16 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .fcard .acts .act{height:36px;font-size:12.5px;border-radius:12px}
 .fcard.live{border-color:rgba(var(--accent-rgb),.6);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.35)}
 .fhint{color:var(--text-mute);font-size:13px;font-weight:550;padding:4px 2px 14px}
+.farm-stream{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:12px;border-radius:var(--radius);background:var(--glass);border:1px solid var(--stroke)}
+.farm-stream .si{width:38px;height:38px;flex:none;border-radius:12px;display:grid;place-items:center;font-size:18px;background:var(--glass-2)}
+.farm-stream.live .si{background:rgba(244,63,94,.18)}
+.farm-stream .sx{flex:1;min-width:200px;font-size:13.5px;font-weight:600;color:var(--text-dim);line-height:1.45}
+.farm-stream .sx b{color:var(--text)}
+.farm-stream .sx small{display:block;font-size:12px;color:var(--text-mute);font-weight:550}
+.farm-stream select{height:36px;max-width:190px;padding:0 10px;border-radius:11px;background:var(--glass-2);color:var(--text);border:1px solid var(--stroke);font:inherit;font-size:12.5px}
+.farm-stream select option{background:#14162b;color:#fff}
+.farm-stream .act{width:auto;height:38px;padding:0 16px;flex:none;font-size:12.5px}
+.farm-stream .shint{flex-basis:100%;font-size:12.5px;color:var(--text-mute);font-weight:550;line-height:1.5}
 .farm-rows{display:flex;flex-direction:column;gap:6px}
 .farm-row{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke)}
 .farm-row:hover{background:var(--glass-2)}
@@ -1063,6 +1073,11 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.2',d:'21 Oct 2026',notes:[
+    'Streaming badge: a new streaming area on the Badge Farm page shows which voice channel you\'re in and whether you\'re live, and counts your streamed time',
+    'Open stream window starts a separate 720p Aurora window to share with Go Live. It shows the game being farmed and keeps running when the farm switches games',
+    'Not in a voice channel? Pick a server and channel and Aurora opens it in Discord for you to join',
+  ]},
   {v:'0.6.1',d:'21 Oct 2026',notes:[
     'Badge Farm: click the search box to browse every game Discord can detect, with an Add button on each — add loads without the list jumping around',
     'The farm\'s game card no longer steals focus or pops over your game: it opens behind everything and minimises itself once Discord has picked it up',
@@ -2604,6 +2619,43 @@ function farmGridInner(){
   const l=farmList();
   return l.length? l.map(farmCard).join('') : '<div class="fhint">Your list is empty. Search above to add games.</div>';
 }
+/* Streaming badge: Discord only lets the client itself Go Live, so we follow
+   the user's voice state and give them a window to share. */
+let VOICE=null, VOICE_AT=0, voiceAsked=false, VC_G='', VC_C='';
+window.setVoice=function(st){
+  VOICE=st; VOICE_AT=Date.now();
+  if(st&&st.error) toast('Couldn\'t open the stream window: '+st.error,'err');
+  const el=byId('farmStream'); if(el){ el.outerHTML=streamHtml(); }
+};
+function streamSecs(){ if(!VOICE) return 0; return (VOICE.streamSecs||0)+(VOICE.streaming?Math.floor((Date.now()-VOICE_AT)/1000):0); }
+setInterval(()=>{ const e=byId('streamSecs'); if(e&&VOICE&&VOICE.streaming) e.textContent=fdur(streamSecs()); },1000);
+function streamPickGuild(id){ VC_G=id; const g=(VOICE.guilds||[]).find(x=>x.id===id); VC_C=g&&g.channels[0]?g.channels[0].id:''; setVoice(VOICE); }
+function streamPickChannel(id){ VC_C=id; }
+function streamJoin(){ if(VC_G&&VC_C){ send('voiceOpen',{guild:VC_G,channel:VC_C}); toast('Opened in Discord. Press Join Voice there'); } }
+function streamHtml(){
+  if(!voiceAsked){ voiceAsked=true; send('voiceWatch'); }
+  const v=VOICE||{}, live=!!v.streaming, win=!!v.window;
+  let ic='🔇', txt;
+  if(!VOICE||!v.ready) txt='<b>Streaming badge</b><small>Checking your voice channel…</small>';
+  else if(v.inVoice){
+    ic=live?'🔴':'🔊';
+    const where=v.channelName?'<b>'+esc(v.channelName)+'</b>'+(v.guildName?' in '+esc(v.guildName):''):'<b>a call</b>';
+    txt=(live?'You\'re live in ':'You\'re in ')+where+'<small>Streamed <span id="streamSecs">'+fdur(streamSecs())+'</span> so far</small>';
+  } else txt='<b>Not in a voice channel</b><small>Pick one to join, then open the stream window. Streamed '+fdur(streamSecs())+' so far</small>';
+  let pick='';
+  if(v.ready&&!v.inVoice&&(v.guilds||[]).length){
+    if(!VC_G||!v.guilds.some(g=>g.id===VC_G)){ VC_G=v.guilds[0].id; VC_C=v.guilds[0].channels[0]?v.guilds[0].channels[0].id:''; }
+    const g=v.guilds.find(x=>x.id===VC_G);
+    pick='<select onchange="streamPickGuild(this.value)">'+v.guilds.map(x=>'<option value="'+esc(x.id)+'"'+(x.id===VC_G?' selected':'')+'>'+esc(x.name||'Server')+'</option>').join('')+'</select>'
+      +'<select onchange="streamPickChannel(this.value)">'+g.channels.map(c=>'<option value="'+esc(c.id)+'"'+(c.id===VC_C?' selected':'')+'>🔊 '+esc(c.name)+'</option>').join('')+'</select>'
+      +'<button class="act ghost" onclick="streamJoin()">Open in Discord</button>';
+  }
+  const btn=win?'<button class="act ghost" onclick="send(\'streamClose\')">Close stream window</button>'
+    :'<button class="act primary" onclick="send(\'streamOpen\')">'+ICO.play+'Open stream window</button>';
+  const hint=win&&!live?'<div class="shint">Now in Discord, click <b>Share Your Screen</b> by your voice controls, open <b>Applications</b>, pick <b>“Aurora Quests stream”</b> and press Go Live. It keeps going when the farm switches games, and it can sit behind your game. Someone has to watch for it to count, for example a second account in Discord Canary.</div>':'';
+  return '<div class="farm-stream'+(live?' live':'')+'" id="farmStream"><div class="si">'+ic+'</div><div class="sx">'+txt+'</div>'+pick+btn+hint+'</div>';
+}
+
 function farmHtml(){
   if(FARM_GAMES===null){ if(!farmLoading){ farmLoading=true; send('farmLoad'); } return '<div class="mid"><div class="spin"></div><p>Loading Discord\'s game list…</p></div>'; }
   if(!FARM_GAMES.length) return '<div class="mid"><div class="ic">'+ICO.warn+'</div><h2>Couldn\'t load Discord\'s game list</h2><p>'+esc(niceError(FARM_ERR||'No games found'))+'</p>'
@@ -2624,7 +2676,7 @@ function farmHtml(){
     +'<button class="chip" id="farmDone" onclick="farmCloseBrowse()"'+(farmBrowse||farmTerm?'':' style="display:none"')+'>Done</button>'
     +'</div>';
   const hint=mins===0?'<div class="fhint">One game mode: pick the game to farm with “Farm this one”. It runs until you pick another or stop.</div>':'';
-  return head+ctl+hint+'<div class="'+(farmBrowse||farmTerm?'farm-rows':'grid')+'" id="farmGrid">'+farmGridInner()+'</div>';
+  return streamHtml()+head+ctl+hint+'<div class="'+(farmBrowse||farmTerm?'farm-rows':'grid')+'" id="farmGrid">'+farmGridInner()+'</div>';
 }
 
 /* Start all: game quests, then video quests, then the badge farm. */

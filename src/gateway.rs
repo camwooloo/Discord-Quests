@@ -225,3 +225,75 @@ fn run_session(
         }
     }
 }
+
+/// Keep a read-only gateway session open forever (reconnecting on drops) and
+/// hand every dispatch to `on` as (event name, data). Used to follow the
+/// user's own voice state for the streaming badge (see stream.rs).
+pub fn listen(token: &str, mut on: impl FnMut(&str, &Value)) {
+    loop {
+        listen_once(token, &mut on);
+        std::thread::sleep(Duration::from_secs(5));
+    }
+}
+
+fn listen_once(token: &str, on: &mut impl FnMut(&str, &Value)) {
+    let Ok((mut ws, _resp)) = tungstenite::connect(GATEWAY) else {
+        return;
+    };
+    set_read_timeout(&ws, Duration::from_millis(500));
+    let mut hb_interval = Duration::from_millis(41250);
+    let mut last_hb = Instant::now();
+    let mut last_seq: Value = Value::Null;
+    let mut identified = false;
+    loop {
+        if identified && last_hb.elapsed() >= hb_interval {
+            let hb = json!({ "op": 1, "d": last_seq });
+            if ws.send(Message::text(hb.to_string())).is_err() {
+                return;
+            }
+            last_hb = Instant::now();
+        }
+        match ws.read() {
+            Ok(Message::Text(txt)) => {
+                let Ok(v) = serde_json::from_str::<Value>(&txt) else {
+                    continue;
+                };
+                if let Some(s) = v.get("s").filter(|s| !s.is_null()) {
+                    last_seq = s.clone();
+                }
+                match v["op"].as_u64().unwrap_or(999) {
+                    0 => on(v["t"].as_str().unwrap_or(""), &v["d"]),
+                    10 => {
+                        if let Some(ms) = v["d"]["heartbeat_interval"].as_u64() {
+                            hb_interval = Duration::from_millis(ms);
+                        }
+                        let identify = json!({
+                            "op": 2,
+                            "d": {
+                                "token": token,
+                                "capabilities": 161789,
+                                "properties": identity_properties(),
+                                "presence": { "status": "online", "since": 0, "activities": [], "afk": false },
+                                "compress": false,
+                                "client_state": { "guild_versions": {} }
+                            }
+                        });
+                        if ws.send(Message::text(identify.to_string())).is_err() {
+                            return;
+                        }
+                        last_hb = Instant::now();
+                        identified = true;
+                    }
+                    7 | 9 => return,
+                    _ => {}
+                }
+            }
+            Ok(Message::Close(_)) => return,
+            Ok(_) => {}
+            Err(tungstenite::Error::Io(e))
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(_) => return,
+        }
+    }
+}
