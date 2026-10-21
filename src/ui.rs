@@ -759,6 +759,13 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .fcard .acts .act{height:36px;font-size:12.5px;border-radius:12px}
 .fcard.live{border-color:rgba(var(--accent-rgb),.6);box-shadow:0 0 0 1px rgba(var(--accent-rgb),.35)}
 .fhint{color:var(--text-mute);font-size:13px;font-weight:550;padding:4px 2px 14px}
+.farm-rows{display:flex;flex-direction:column;gap:6px}
+.farm-row{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:var(--glass);border:1px solid var(--stroke)}
+.farm-row:hover{background:var(--glass-2)}
+.farm-row .n{flex:1;min-width:0;font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.farm-row .pop{font-size:11px;font-weight:800;color:var(--accent);letter-spacing:.4px;text-transform:uppercase}
+.farm-row .h{font-size:12px;color:var(--text-mute);font-weight:600}
+.farm-row .act{width:auto;height:32px;padding:0 14px;font-size:12.5px;border-radius:10px;flex:none}
 .hist-ic{width:30px;height:30px;flex:none;border-radius:9px;background:#11142a center/cover no-repeat}
 .settings2{display:grid;grid-template-columns:1fr 340px;gap:22px;align-items:start}
 @media(max-width:920px){.settings2{grid-template-columns:1fr}}
@@ -1056,6 +1063,10 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.1',d:'21 Oct 2026',notes:[
+    'Badge Farm: click the search box to browse every game Discord can detect, with an Add button on each — add loads without the list jumping around',
+    'The farm\'s game card no longer steals focus or pops over your game: it opens behind everything and minimises itself once Discord has picked it up',
+  ]},
   {v:'0.6.0',d:'21 Oct 2026',notes:[
     'Badge farming now actually counts: Discord only detects a game that has a window, so each farmed game opens a small Aurora card (bottom-right) with the game\'s art. It also uses each game\'s main program now (no more Garena League).',
     'One Badge Farm instead of two: cycle through Popular or your own list for 5–30 min per game, or pick One game to farm until you switch. Hours count toward Game Time either way.',
@@ -1427,6 +1438,7 @@ function onCompleted(q){
 /* ====================== nav / filters ====================== */
 const TITLES={home:'Home',video:'Watch Videos',game:'Play Games',claim:'Claim Rewards',shop:'Orb Shop',badges:'Badges',history:'Quest History',farm:'Badge Farm',profile:'Your Profile',settings:'Settings'};
 function setNav(n){
+  if(n!=='farm'){ farmBrowse=false; farmTerm=''; }
   NAV=n; custView=null; byId('pageTitle').textContent=TITLES[n];
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.nav===n));
   byId('railAvatar').classList.toggle('active',n==='profile');
@@ -2483,7 +2495,7 @@ window.playError=function(id,msg){ if(CURPLAY&&CURPLAY.id===id) byId('pillTime')
    it also counts toward Game Time), or stay on one game until switched. The
    backend runs a stand-in process named like each game so the Discord client
    detects it (see farm.rs). */
-let FARM_GAMES=null, FARM_CFG={}, FARM_ERR=null, farmLoading=false, FARM=null, farmTerm='';
+let FARM_GAMES=null, FARM_CFG={}, FARM_ERR=null, farmLoading=false, FARM=null, farmTerm='', farmBrowse=false;
 window.setFarm=function(games,cfg,err){
   farmLoading=false; FARM_GAMES=games||[]; if(cfg) FARM_CFG=cfg; FARM_ERR=err||null;
   if(NAV==='farm') render();
@@ -2539,7 +2551,27 @@ function farmToggleMine(id){
   if(i<0) toast('Added '+((fgame(id)||{}).name||'game')+' to your list');
   render();
 }
-function farmSearch(){ farmTerm=(byId('farmQ').value||'').trim().toLowerCase(); const g=byId('farmGrid'); if(g) g.innerHTML=farmGridInner(); }
+function farmSearch(){ farmTerm=(byId('farmQ').value||'').trim().toLowerCase(); farmFillGrid(); }
+function farmFillGrid(){ const g=byId('farmGrid'); if(!g) return; const rows=farmBrowse||!!farmTerm;
+  g.className=rows?'farm-rows':'grid'; g.innerHTML=farmGridInner();
+  const d=byId('farmDone'); if(d) d.style.display=rows?'':'none'; }
+// Clicking the search box opens the full game list with Add buttons; Done closes it.
+function farmOpenBrowse(){ if(farmBrowse) return; farmBrowse=true; farmFillGrid(); }
+function farmCloseBrowse(){ farmBrowse=false; farmTerm=''; render(); }
+// Add/remove from the browse list in place, so the list never jumps.
+function farmRowToggle(id,btn){
+  const l=farmCustom(), i=l.indexOf(id);
+  if(i>=0) l.splice(i,1); else l.push(id);
+  send('farmSave',{custom:l}); if(FARM&&FARM_CFG.use_custom&&farmMins()>0) send('farmStart');
+  btn.className='act '+(i<0?'primary':'ghost'); btn.innerHTML=i<0?ICO.check+'Added':'+ Add';
+  const n=byId('farmMineN'); if(n) n.textContent=l.length;
+}
+function farmRow(g){
+  const mine=farmCustom().includes(g.id), img=g.icon?'https://cdn.discordapp.com/app-icons/'+g.id+'/'+g.icon+'.png?size=64':'', secs=farmSecs(g.id);
+  return '<div class="farm-row"><span class="hist-ic"'+(img?' style="background-image:url(\''+esc(img)+'\')"':'')+'></span>'
+    +'<span class="n">'+esc(g.name)+'</span>'+(g.pop!=null?'<span class="pop">Popular</span>':'')+(secs?'<span class="h">'+fdur(secs)+'</span>':'')
+    +'<button class="act '+(mine?'primary':'ghost')+'" onclick="farmRowToggle(\''+g.id+'\',this)">'+(mine?ICO.check+'Added':'+ Add')+'</button></div>';
+}
 function farmNow(){
   const n=farmList().length, mins=farmMins();
   if(!FARM) return mins===0
@@ -2564,9 +2596,10 @@ function farmCard(g){
     +'<div class="row" id="fh-'+g.id+'">'+ICO.clock+fdur(farmSecs(g.id))+' farmed</div><div class="grow"></div>'+acts+'</div></article>';
 }
 function farmGridInner(){
-  if(farmTerm){
-    const hits=(FARM_GAMES||[]).filter(g=>g.name.toLowerCase().includes(farmTerm)).slice(0,60);
-    return hits.length? hits.map(farmCard).join('') : '<div class="fhint">No game Discord can detect matches that.</div>';
+  if(farmBrowse||farmTerm){
+    const all=FARM_GAMES||[], hits=farmTerm?all.filter(g=>g.name.toLowerCase().includes(farmTerm)):all, shown=hits.slice(0,200);
+    if(!shown.length) return '<div class="fhint">No game Discord can detect matches that.</div>';
+    return shown.map(farmRow).join('')+(hits.length>shown.length?'<div class="fhint">Showing '+shown.length+' of '+hits.length.toLocaleString()+' — type to narrow it down.</div>':'');
   }
   const l=farmList();
   return l.length? l.map(farmCard).join('') : '<div class="fhint">Your list is empty. Search above to add games.</div>';
@@ -2582,15 +2615,16 @@ function farmHtml(){
     +'<div class="farm-tot" id="farmTot">'+farmTotHtml()+'</div>'
     +(FARM?'<button class="act ghost" onclick="farmStop()">Stop farm</button>':'<button class="act primary" onclick="farmStart()">'+ICO.play+'Start farm</button>')+'</div>';
   const ctl='<div class="farm-ctl">'
-    +'<div class="grp"><span>Games</span>'+chip(!custom,'Popular','farmUseCustom(false)')+chip(custom,'My list ('+farmCustom().length+')','farmUseCustom(true)')+'</div>'
+    +'<div class="grp"><span>Games</span>'+chip(!custom,'Popular','farmUseCustom(false)')+chip(custom,'My list (<span id="farmMineN">'+farmCustom().length+'</span>)','farmUseCustom(true)')+'</div>'
     +'<div class="grp"><span>Per game</span>'+[5,10,15,30].map(m=>chip(mins===m,m+'m','farmSetMinutes('+m+')')).join('')+chip(mins===0,'One game','farmSetMinutes(0)')+'</div>'
     +'<div class="grp"><span>Breaks</span>'+chip(!pa,'Off','farmSetPause(0)')+[60,120,240].map(m=>chip(pa===m,'every '+(m/60)+'h','farmSetPause('+m+')')).join('')
       +(pa?' <span>for</span>'+[15,30,60,120].map(m=>chip(pf===m,m<60?m+'m':(m/60)+'h','farmSetPause('+pa+','+m+')')).join(''):'')+'</div>'
     +'<div class="ctl search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-3.6-3.6"/></svg>'
-      +'<input id="farmQ" value="'+esc(farmTerm)+'" placeholder="Search '+FARM_GAMES.length.toLocaleString()+' games to add" oninput="farmSearch()" spellcheck="false"></div>'
+      +'<input id="farmQ" value="'+esc(farmTerm)+'" placeholder="Search '+FARM_GAMES.length.toLocaleString()+' games to add" onfocus="farmOpenBrowse()" oninput="farmSearch()" spellcheck="false"></div>'
+    +'<button class="chip" id="farmDone" onclick="farmCloseBrowse()"'+(farmBrowse||farmTerm?'':' style="display:none"')+'>Done</button>'
     +'</div>';
   const hint=mins===0?'<div class="fhint">One game mode: pick the game to farm with “Farm this one”. It runs until you pick another or stop.</div>':'';
-  return head+ctl+hint+'<div class="grid" id="farmGrid">'+farmGridInner()+'</div>';
+  return head+ctl+hint+'<div class="'+(farmBrowse||farmTerm?'farm-rows':'grid')+'" id="farmGrid">'+farmGridInner()+'</div>';
 }
 
 /* Start all: game quests, then video quests, then the badge farm. */
