@@ -68,8 +68,8 @@ fn main() -> wry::Result<()> {
     // so it never opens the app window or touches the network.
     if let Some(i) = args.iter().position(|a| a == "--farm-stub") {
         let title = args.get(i + 1).map(String::as_str).unwrap_or("Game");
-        let mode = args.get(i + 2).map(String::as_str).unwrap_or("offscreen");
-        farm::run_stub(title, mode);
+        let image = args.get(i + 2).map(String::as_str).unwrap_or("");
+        farm::run_stub(title, image);
         return Ok(());
     }
     if args.iter().any(|a| a == "--list") {

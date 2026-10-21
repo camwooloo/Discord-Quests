@@ -1056,6 +1056,14 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.0',d:'21 Oct 2026',notes:[
+    'Badge farming now actually counts: Discord only detects a game that has a window, so each farmed game opens a small Aurora card (bottom-right) with the game\'s art. It also uses each game\'s main program now (no more Garena League).',
+    'One Badge Farm instead of two: cycle through Popular or your own list for 5–30 min per game, or pick One game to farm until you switch. Hours count toward Game Time either way.',
+    'Breaks: pause every 1, 2 or 4 hours for 15 min to 2 hours, so the farm doesn\'t run 24/7',
+    'Badge Farm looks like the quest pages now: controls up top, game cards with art and hours farmed. Adding games no longer jumps back to the top.',
+    'Homepage: Start all (game quests, then videos, then badge farming) and a Badge farm button. Farming stats are on the homepage and History.',
+    'Removed the Misc tab',
+  ]},
   {v:'0.5.5',d:'21 Oct 2026',notes:[
     'Fixed the Badge Farm tab failing with "Couldn\'t load Discord\'s game list" — Discord\'s list is bigger than the old download limit',
   ]},

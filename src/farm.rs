@@ -5,10 +5,11 @@
 // known executables running. The list of those executables is Discord's public
 // detectable-applications list (`/applications/detectable`), which we cache in
 // the config dir. To "play" a game we copy our own binary to a path ending in
-// that game's executable name and run it with `--farm-stub`, which just idles
-// until we kill it (or we exit — it watches its stdin pipe). The local Discord
-// client then detects it like the real game. If "Show game on my profile" is
-// on, we also broadcast it over the gateway, same as quest play.
+// that game's executable name and run it with `--farm-stub`, which shows a
+// small card window (Discord ignores windowless processes) until we kill it
+// or we exit (it watches its stdin pipe). The local Discord client then
+// detects it like the real game. If "Show game on my profile" is on, we also
+// broadcast it over the gateway, same as quest play.
 //
 // One farm at a time. It either cycles through a list of games, N minutes
 // each (Game Variety, and every minute also counts toward Game Time), or with
@@ -329,13 +330,12 @@ pub fn plan(cfg: &Config, all: &[Game]) -> Vec<Game> {
 // The stand-in game process
 // ---------------------------------------------------------------------------
 
-/// `--farm-stub <title> [mode]`: show a small window and idle until our stdin
-/// closes (the app stopped us or exited). Discord's detector only counts
-/// processes that own a visible top-level window, so a windowless stub is
-/// ignored. Modes, for testing what the detector accepts: `offscreen`
-/// (default, parked off-screen), `notaskbar` (off-screen and hidden from the
-/// taskbar), `onscreen` (a small window in the corner).
-pub fn run_stub(title: &str, mode: &str) {
+/// `--farm-stub <title> [image url]`: show a small card window and idle until
+/// our stdin closes (the app stopped us or exited). Discord's detector only
+/// counts processes that own a visible top-level window (a windowless stub is
+/// ignored), so the card sits in the bottom-right corner, shows the game's art
+/// and says plainly that Aurora is farming it.
+pub fn run_stub(title: &str, image: &str) {
     use tao::dpi::{LogicalSize, PhysicalPosition};
     use tao::event::{Event, WindowEvent};
     use tao::event_loop::{ControlFlow, EventLoop};
@@ -354,37 +354,69 @@ pub fn run_stub(title: &str, mode: &str) {
     });
 
     let event_loop = EventLoop::new();
-    let pos = if mode == "onscreen" {
-        PhysicalPosition::new(0, 0)
-    } else {
-        // Far past any monitor, but not -32000 (Windows' "minimized" spot).
-        PhysicalPosition::new(-20000, -20000)
-    };
-    #[allow(unused_mut)]
-    let mut builder = WindowBuilder::new()
-        .with_title(format!("{title} · Aurora badge farm"))
-        .with_inner_size(LogicalSize::new(260.0, 70.0))
-        .with_position(pos)
+    let (w, h) = (340.0, 190.0);
+    let builder = WindowBuilder::new()
+        .with_title(format!("{title} · Aurora Quests badge farm"))
+        .with_inner_size(LogicalSize::new(w, h))
+        .with_decorations(false)
         .with_resizable(false)
         .with_focused(false);
-    #[cfg(windows)]
-    {
-        use tao::platform::windows::WindowBuilderExtWindows;
-        builder = builder.with_skip_taskbar(mode == "notaskbar");
-    }
-    let Ok(_window) = builder.build(&event_loop) else {
+    let Ok(window) = builder.build(&event_loop) else {
         // No window possible: still idle so the process at least exists.
         loop {
             std::thread::sleep(Duration::from_secs(3600));
         }
     };
+    // Bottom-right of the primary screen, clear of the taskbar.
+    if let Some(m) = window.primary_monitor() {
+        let (sz, at, sf) = (m.size(), m.position(), m.scale_factor());
+        window.set_outer_position(PhysicalPosition::new(
+            at.x + sz.width as i32 - ((w + 16.0) * sf) as i32,
+            at.y + sz.height as i32 - ((h + 64.0) * sf) as i32,
+        ));
+    }
+    let html = stub_html(title, image);
+    let _webview = wry::WebViewBuilder::new().with_html(html).build(&window);
     event_loop.run(move |event, _, flow| {
         *flow = ControlFlow::Wait;
-        // Closing the window just stops this game; the farm restarts it.
         if let Event::WindowEvent { event: WindowEvent::CloseRequested, .. } = event {
             std::process::exit(0);
         }
     });
+}
+
+/// The stand-in's card: game art behind an Aurora banner.
+fn stub_html(title: &str, image: &str) -> String {
+    let esc = |s: &str| {
+        s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    };
+    let art = if image.starts_with("https://cdn.discordapp.com/") {
+        format!("background-image:url(\"{}\")", esc(image))
+    } else {
+        String::new()
+    };
+    format!(
+        r#"<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;color:#fff;background:#0b0c18;user-select:none}}
+.art{{position:absolute;inset:0;background:#141633 center/cover no-repeat;{art}}}
+.art::after{{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,12,24,.15),rgba(11,12,24,.92) 72%)}}
+.top{{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:8px}}
+.logo{{width:26px;height:26px;border-radius:8px}}
+.badge{{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:4px 9px;border-radius:8px;
+  background:linear-gradient(135deg,#b48cff,#34d399);color:#0b0616}}
+.live{{margin-left:auto;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;background:rgba(11,12,24,.7)}}
+.live i{{display:inline-block;width:7px;height:7px;border-radius:50%;background:#34d399;margin-right:6px;animation:p 1.4s infinite}}
+@keyframes p{{50%{{opacity:.3}}}}
+.foot{{position:absolute;left:14px;right:14px;bottom:12px}}
+.g{{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+.s{{font-size:12px;opacity:.75;margin-top:2px}}
+</style></head><body><div class="art"></div>
+<div class="top"><img class="logo" src="{logo}"><span class="badge">Aurora Quests</span><span class="live"><i></i>Badge farming</span></div>
+<div class="foot"><div class="g">{name}</div><div class="s">Stand-in run by Aurora Quests so Discord counts this game. Stop it from Aurora.</div></div>
+</body></html>"#,
+        logo = crate::assets::logo_uri(),
+        name = esc(title),
+    )
 }
 
 /// Copy our binary to `<config>/farm/<app id>/<exe path>` and start it there.
@@ -416,8 +448,15 @@ fn spawn_stub(game: &Game) -> Result<Child, String> {
         }
     }
     let mut cmd = Command::new(&target);
+    let image = game
+        .cover
+        .as_ref()
+        .or(game.icon.as_ref())
+        .map(|h| format!("https://cdn.discordapp.com/app-icons/{}/{h}.png?size=512", game.id))
+        .unwrap_or_default();
     cmd.arg("--farm-stub")
         .arg(&game.name)
+        .arg(image)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
