@@ -5,6 +5,7 @@
 
 mod assets;
 mod discord;
+mod farm;
 mod gateway;
 mod history;
 mod platform;
@@ -53,6 +54,8 @@ type Sealed = Arc<Mutex<HashMap<String, String>>>;
 type PlayInfo = Arc<Mutex<HashMap<String, (String, String, u64, String)>>>;
 /// The single active play session's stop flag + quest id.
 type Player = Arc<Mutex<Option<(String, Arc<AtomicBool>)>>>;
+/// The running badge farm's stop flag (one farm at a time).
+type Farmer = Arc<Mutex<Option<Arc<AtomicBool>>>>;
 
 /// Heartbeat interval for play quests (seconds). Discord accrues playtime from
 /// real elapsed time between beats, so a game quest still takes its full target.
@@ -61,6 +64,12 @@ const PLAY_BEAT_SECS: u64 = 25;
 fn main() -> wry::Result<()> {
     // Headless helpers for quick checks / debugging (see functions below).
     let args: Vec<String> = std::env::args().collect();
+    // Stand-in game process for badge farming (see farm.rs) — must stay first
+    // so it never opens a window or touches the network.
+    if args.iter().any(|a| a == "--farm-stub") {
+        farm::run_stub();
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--list") {
         run_cli();
         return Ok(());
@@ -107,6 +116,7 @@ fn run_gui() -> wry::Result<()> {
     let sealed: Sealed = Arc::new(Mutex::new(HashMap::new()));
     let play_info: PlayInfo = Arc::new(Mutex::new(HashMap::new()));
     let player: Player = Arc::new(Mutex::new(None));
+    let farmer: Farmer = Arc::new(Mutex::new(None));
     // Holds the pending update's download URL between the check and the user's OK.
     let update_url: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
     // Gateway presence — connects lazily on first "show game" request.
@@ -138,6 +148,7 @@ fn run_gui() -> wry::Result<()> {
             sealed: sealed.clone(),
             play_info: play_info.clone(),
             player: player.clone(),
+            farmer: farmer.clone(),
             presence: presence.clone(),
             update_url: update_url.clone(),
         };
@@ -256,6 +267,7 @@ struct IpcCtx {
     sealed: Sealed,
     play_info: PlayInfo,
     player: Player,
+    farmer: Farmer,
     presence: Arc<gateway::Presence>,
     update_url: Arc<Mutex<Option<String>>>,
 }
@@ -375,6 +387,76 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             });
         }
         "clearPresence" => ctx.presence.clear(),
+        "farmLoad" => {
+            // Detectable games + saved farm config for the Badge Farm page.
+            let proxy = proxy.clone();
+            std::thread::spawn(move || {
+                let cfg = serde_json::to_string(&farm::load()).unwrap_or_else(|_| "null".into());
+                let js = match farm::games() {
+                    Ok(g) => format!("window.setFarm({},{cfg})", farm::games_json(&g)),
+                    Err(e) => format!(
+                        "window.setFarm(null,{cfg},{})",
+                        serde_json::to_string(&e).unwrap_or_else(|_| "\"error\"".into())
+                    ),
+                };
+                let _ = proxy.send_event(UserEvent::Eval(js));
+            });
+        }
+        "farmSave" => {
+            let v = v.clone();
+            std::thread::spawn(move || {
+                let mut c = farm::load();
+                if let Some(s) = v["hoursGame"].as_str() {
+                    c.hours_game = s.to_string();
+                }
+                if let Some(a) = v["varietyCustom"].as_array() {
+                    c.variety_custom = a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+                }
+                if let Some(b) = v["varietyUseCustom"].as_bool() {
+                    c.variety_use_custom = b;
+                }
+                if let Some(m) = v["varietyMinutes"].as_u64() {
+                    c.variety_minutes = m.clamp(1, 240);
+                }
+                farm::save(&c);
+            });
+        }
+        "farmStart" => {
+            let mode = if v["mode"].as_str() == Some("hours") { "hours" } else { "variety" }.to_string();
+            let stop = Arc::new(AtomicBool::new(false));
+            if let Some(old) = ctx.farmer.lock().unwrap().replace(stop.clone()) {
+                old.store(true, Ordering::SeqCst);
+            }
+            let proxy = proxy.clone();
+            let presence = ctx.presence.clone();
+            let farmer = ctx.farmer.clone();
+            std::thread::spawn(move || {
+                let cfg = farm::load();
+                let list = match farm::games() {
+                    Ok(all) => farm::plan(&mode, &cfg, &all),
+                    Err(e) => {
+                        let st = serde_json::json!({ "mode": mode, "error": e });
+                        let _ = proxy.send_event(UserEvent::Eval(format!("window.farmStatus({st})")));
+                        return;
+                    }
+                };
+                let p = proxy.clone();
+                farm::run(mode, list, cfg.variety_minutes, stop.clone(), presence, move |st| {
+                    let _ = p.send_event(UserEvent::Eval(format!("window.farmStatus({st})")));
+                });
+                // Clear ourselves if we're still the active farm.
+                let mut f = farmer.lock().unwrap();
+                if f.as_ref().map(|s| Arc::ptr_eq(s, &stop)).unwrap_or(false) {
+                    *f = None;
+                }
+            });
+        }
+        "farmStop" => {
+            if let Some(stop) = ctx.farmer.lock().unwrap().take() {
+                stop.store(true, Ordering::SeqCst);
+                ctx.presence.clear();
+            }
+        }
         "saveImage" => {
             use base64::{engine::general_purpose::STANDARD, Engine as _};
             let name = v["name"].as_str().unwrap_or("aurora-image").to_string();
