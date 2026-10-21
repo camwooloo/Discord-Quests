@@ -1055,6 +1055,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.5.3',d:'21 Oct 2026',notes:[
+    'Fixed the Account Age badge showing tier 1 (Seed): it now always matches how old your account actually is',
+  ]},
   {v:'0.5.2',d:'21 Oct 2026',notes:[
     'Account Age, Streaming, Game Time & Game Variety badges are live on Discord now — the Badges tab reads your real tier and lights the ladder up to it, with the tier name under your badge',
     'Renamed Game Depth → Game Time and Game Diversity → Game Variety to match the Discord client',
@@ -1474,9 +1477,9 @@ function NOW(){ return Date.now(); }
 function realTile(b,extra,locked){
   const nm=nameFor(b.id);
   // Tiered badges fall back to the embedded tier icon if the CDN image fails.
-  const f=TIERED.find(f=>f.match(b)), local=f?BADGE_IMGS[f.img+badgeTier(f,b)]:null;
+  const f=TIERED.find(f=>f.match(b)), local=f?BADGE_IMGS[f.img+familyTier(f).tier]:null;
   const fb=local?'this.onerror=null;this.src=\''+local+'\'':'this.parentElement.innerHTML=\'🏅\'';
-  if(f&&!extra) extra=f.tiers[badgeTier(f,b)-1][0];
+  if(f&&!extra) extra=f.tiers[familyTier(f).tier-1][0];
   return '<div class="btile'+(locked?' locked':'')+'" data-tip="'+esc(b.description||nm)+(locked?' · Locked':'')+'">'
     +'<div class="bimg"><img src="'+badgeSrc(b)+'" alt="" onerror="'+fb+'"></div>'
     +'<div class="bnm">'+esc(nm)+'</div>'+(extra?'<div class="bsub">'+esc(extra)+'</div>':'')+'</div>';
@@ -1536,12 +1539,18 @@ function badgeTier(f,b){
   const unit=f.key==='age'?'year':f.key==='variety'?'game':'hour';
   const a=d.replace(/,/g,'').match(new RegExp('(\\d+)\\+?\\s*'+unit,'i'));
   if(a){ const n=+a[1]; let t=1; f.need.forEach((v,i)=>{ if(n>=v) t=i+1; }); return t; }
-  return 1;
+  return 0; // earned, but nothing says which tier
 }
 function familyTier(f){
   const b=earnedBadges().find(f.match);
-  return b?{tier:badgeTier(f,b),badge:b}:{tier:0,badge:null};
+  if(!b) return {tier:0,badge:null};
+  let t=badgeTier(f,b);
+  // Account Age is fixed by the account's creation date, so trust that over
+  // whatever (if anything) the badge text gives us.
+  if(f.key==='age') t=Math.max(t,ageTier());
+  return {tier:t||1,badge:b};
 }
+function ageTier(){ const ay=ageYears(); let t=0; AGE_TIERS.forEach((x,i)=>{ if(ay>=i+1) t=i+1; }); return t; }
 function tierFamily(title,emoji,intro,tiers,achievedCount,realIcon,imgPrefix){
   const tiles=tiers.map((t,i)=>{
     const on=i<achievedCount, cur=i===achievedCount-1;
@@ -1562,7 +1571,7 @@ function badgesHtml(){
   const ownedNames=new Set(all.map(b=>nameFor(b.id)));
   const locked=LOCKED_CATALOG.filter(d=>!ownedNames.has(nameFor(d.id)));
   const ay=ageYears();
-  let ageDone=0; AGE_TIERS.forEach((t,i)=>{ if(ay>=(i+1===10?10:i+1)) ageDone=i+1; });
+  const ageDone=ageTier();
   const giftDone=giftCurrentTier();
 
   let out='<div class="badges">';
