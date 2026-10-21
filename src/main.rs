@@ -65,9 +65,11 @@ fn main() -> wry::Result<()> {
     // Headless helpers for quick checks / debugging (see functions below).
     let args: Vec<String> = std::env::args().collect();
     // Stand-in game process for badge farming (see farm.rs) — must stay first
-    // so it never opens a window or touches the network.
-    if args.iter().any(|a| a == "--farm-stub") {
-        farm::run_stub();
+    // so it never opens the app window or touches the network.
+    if let Some(i) = args.iter().position(|a| a == "--farm-stub") {
+        let title = args.get(i + 1).map(String::as_str).unwrap_or("Game");
+        let mode = args.get(i + 2).map(String::as_str).unwrap_or("offscreen");
+        farm::run_stub(title, mode);
         return Ok(());
     }
     if args.iter().any(|a| a == "--list") {
@@ -403,26 +405,29 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             });
         }
         "farmSave" => {
-            let v = v.clone();
-            std::thread::spawn(move || {
-                let mut c = farm::load();
-                if let Some(s) = v["hoursGame"].as_str() {
-                    c.hours_game = s.to_string();
-                }
-                if let Some(a) = v["varietyCustom"].as_array() {
-                    c.variety_custom = a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
-                }
-                if let Some(b) = v["varietyUseCustom"].as_bool() {
-                    c.variety_use_custom = b;
-                }
-                if let Some(m) = v["varietyMinutes"].as_u64() {
-                    c.variety_minutes = m.clamp(1, 240);
-                }
-                farm::save(&c);
-            });
+            // Synchronous so a farmStart sent right after sees the new settings.
+            let mut c = farm::load();
+            if let Some(s) = v["singleGame"].as_str() {
+                c.single_game = s.to_string();
+            }
+            if let Some(a) = v["custom"].as_array() {
+                c.custom = a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+            }
+            if let Some(b) = v["useCustom"].as_bool() {
+                c.use_custom = b;
+            }
+            if let Some(m) = v["minutes"].as_u64() {
+                c.minutes = m.min(240);
+            }
+            if let Some(m) = v["pauseAfter"].as_u64() {
+                c.pause_after_mins = m.min(24 * 60);
+            }
+            if let Some(m) = v["pauseFor"].as_u64() {
+                c.pause_for_mins = m.clamp(1, 24 * 60);
+            }
+            farm::save(&c);
         }
         "farmStart" => {
-            let mode = if v["mode"].as_str() == Some("hours") { "hours" } else { "variety" }.to_string();
             let stop = Arc::new(AtomicBool::new(false));
             if let Some(old) = ctx.farmer.lock().unwrap().replace(stop.clone()) {
                 old.store(true, Ordering::SeqCst);
@@ -433,15 +438,19 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             std::thread::spawn(move || {
                 let cfg = farm::load();
                 let list = match farm::games() {
-                    Ok(all) => farm::plan(&mode, &cfg, &all),
+                    Ok(all) => farm::plan(&cfg, &all),
                     Err(e) => {
-                        let st = serde_json::json!({ "mode": mode, "error": e });
+                        let st = serde_json::json!({ "error": e });
                         let _ = proxy.send_event(UserEvent::Eval(format!("window.farmStatus({st})")));
                         return;
                     }
                 };
                 let p = proxy.clone();
-                farm::run(mode, list, cfg.variety_minutes, stop.clone(), presence, move |st| {
+                let pause = (cfg.pause_after_mins > 0).then(|| {
+                    let m = |n: u64| std::time::Duration::from_secs(n * 60);
+                    (m(cfg.pause_after_mins), m(cfg.pause_for_mins.max(1)))
+                });
+                farm::run(list, cfg.minutes, pause, stop.clone(), presence, move |st| {
                     let _ = p.send_event(UserEvent::Eval(format!("window.farmStatus({st})")));
                 });
                 // Clear ourselves if we're still the active farm.
@@ -626,6 +635,10 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             let s = settings::load();
             if let Ok(js) = serde_json::to_string(&s) {
                 let _ = proxy.send_event(UserEvent::Eval(format!("window.setSettings({js})")));
+            }
+            // Badge-farm settings + totals (homepage and History show them).
+            if let Ok(js) = serde_json::to_string(&farm::load()) {
+                let _ = proxy.send_event(UserEvent::Eval(format!("window.setFarmCfg&&window.setFarmCfg({js})")));
             }
             // Push the completed-quest history for the History view.
             if let Ok(js) = serde_json::to_string(&history::load()) {
