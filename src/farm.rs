@@ -30,6 +30,8 @@ use crate::quests::CLIENT_UA;
 const DETECTABLE_URL: &str = "https://discord.com/api/v9/applications/detectable";
 /// Re-download the detectable list after this long (it changes slowly).
 const CACHE_MAX_AGE: Duration = Duration::from_secs(3 * 24 * 3600);
+/// Upper bound on the detectable list download (it's tens of MB at most).
+const MAX_LIST_BYTES: u64 = 128 * 1024 * 1024;
 
 /// Popular games, most popular first. Matched by name against the detectable
 /// list, so a game Discord no longer lists is simply skipped.
@@ -149,7 +151,16 @@ fn detectable_raw() -> Result<String, String> {
         .timeout(Duration::from_secs(30))
         .call()
         .map_err(|e| e.to_string())
-        .and_then(|r| r.into_string().map_err(|e| e.to_string()));
+        .and_then(|r| {
+            // The list is well over ureq's 10 MB `into_string` cap, so read it ourselves.
+            use std::io::Read;
+            let mut s = String::new();
+            r.into_reader()
+                .take(MAX_LIST_BYTES)
+                .read_to_string(&mut s)
+                .map_err(|e| e.to_string())?;
+            Ok(s)
+        });
     match fetched {
         Ok(s) if s.trim_start().starts_with('[') => {
             if let Some(d) = p.parent() {
@@ -159,7 +170,7 @@ fn detectable_raw() -> Result<String, String> {
             Ok(s)
         }
         Ok(_) => std::fs::read_to_string(&p).map_err(|_| "unexpected response from Discord".into()),
-        Err(e) => std::fs::read_to_string(&p).map_err(|_| format!("network error: {e}")),
+        Err(e) => std::fs::read_to_string(&p).map_err(|_| format!("couldn't download Discord's game list: {e}")),
     }
 }
 
