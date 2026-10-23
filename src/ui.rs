@@ -1081,6 +1081,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.5',d:'23 Oct 2026',notes:[
+    'Badges: Game Time, Game Variety and Streaming now show the tier Discord gives you, with your hours or games and how many more you need for the next tier',
+  ]},
   {v:'0.6.4',d:'23 Oct 2026',notes:[
     'Game quests now run the same small game window as badge farming, so Discord itself sees the game while the quest plays',
     'Settings → Data → Reset stats clears your Aurora stats, History and farming totals (click twice to confirm)',
@@ -1592,14 +1595,33 @@ TIERED.forEach(f=>{
   f.match=b=>{ const id=(b&&b.id||'').toLowerCase();
     return f.hints.some(h=>id.includes(h))||(!!b&&f.tiers.some(t=>wordIn(b.description,t[0]))&&!/gift/i.test(id)); };
 });
+const familyUnit=f=>f.key==='age'?'year':f.key==='variety'?'game':'hour';
+// The amount Discord puts in the badge text, e.g. "29 games played" or
+// "240 hours of games played" (null if there isn't one).
+function badgeAmount(f,b){
+  const a=(b&&b.description||'').replace(/,/g,'').match(new RegExp('(\\d+)\\+?\\s*'+familyUnit(f),'i'));
+  return a?+a[1]:null;
+}
 function badgeTier(f,b){
+  // The amount is the most reliable: tier names can appear in other text and
+  // the id's number isn't always the tier.
+  const n=badgeAmount(f,b);
+  if(n!=null){ let t=0; f.need.forEach((v,i)=>{ if(n>=v) t=i+1; }); if(t) return t; }
   const d=(b.description||'');
   for(let i=f.tiers.length-1;i>=0;i--) if(wordIn(d,f.tiers[i][0])) return i+1;
-  const m=(b.id||'').match(/(\d+)$/); if(m){ const n=+m[1]; if(n>=1&&n<=f.tiers.length) return n; }
-  const unit=f.key==='age'?'year':f.key==='variety'?'game':'hour';
-  const a=d.replace(/,/g,'').match(new RegExp('(\\d+)\\+?\\s*'+unit,'i'));
-  if(a){ const n=+a[1]; let t=1; f.need.forEach((v,i)=>{ if(n>=v) t=i+1; }); return t; }
+  const m=(b.id||'').match(/(\d+)$/); if(m){ const k=+m[1]; if(k>=1&&k<=f.tiers.length) return k; }
   return 0; // earned, but nothing says which tier
+}
+// Discord's logged play time ({games, secs}) plus Aurora's streamed time.
+let PLAY_STATS=null;
+window.setPlayStats=function(p){ PLAY_STATS=p||null; if(NAV==='badges') render(); };
+function familyProgress(f){
+  const p=PLAY_STATS; if(!p) return '';
+  const h=s=>{ const x=(s||0)/3600; return (x>=10?Math.round(x).toLocaleString():x.toFixed(1))+' hours'; };
+  if(f.key==='time') return ' Discord has logged '+h(p.secs)+' of play.';
+  if(f.key==='variety') return ' Discord has logged '+(p.games||0).toLocaleString()+' games.';
+  if(f.key==='stream'&&p.streamSecs) return ' Aurora has seen you live for '+h(p.streamSecs)+'.';
+  return '';
 }
 function familyTier(f){
   const b=earnedBadges().find(f.match);
@@ -1645,10 +1667,12 @@ function badgesHtml(){
     // Account Age can be worked out from the account's creation date even
     // before the badge itself shows up on the profile.
     const t=r.tier||(f.key==='age'?ageDone:0);
-    const intro=r.tier? ('You\'re on '+f.tiers[t-1][0]+' — tier '+t+' of 10.'+(t<10?' Next: '+f.tiers[t][0]+' at '+f.tiers[t][1]+'.':''))
+    const amt=r.badge?badgeAmount(f,r.badge):null, unit=familyUnit(f), plural=n=>n.toLocaleString()+' '+unit+(n===1?'':'s');
+    const intro=r.tier? ('You\'re on '+f.tiers[t-1][0]+' — tier '+t+' of 10'+(amt!=null?', with '+plural(amt):'')+'.'
+        +(t<10?' Next: '+f.tiers[t][0]+' at '+f.tiers[t][1]+(amt!=null&&f.need[t]>amt?' ('+plural(f.need[t]-amt)+' to go)':'')+'.':''))
       : f.key==='age'&&t? ('Your account is ~'+Math.floor(ay)+' years old, which is '+f.tiers[t-1][0]+' (tier '+t+' of 10).')
       : ('Not unlocked yet. '+f.unlock);
-    out+=tierFamily(f.title,f.emoji,intro,f.tiers,t,r.badge?badgeSrc(r.badge):null,f.img);
+    out+=tierFamily(f.title,f.emoji,intro+(amt!=null?'':familyProgress(f)),f.tiers,t,r.badge?badgeSrc(r.badge):null,f.img);
   });
   out+='<div class="bsec"><div class="bsec-h">Locked <span>'+locked.length+'</span></div><div class="bgrid">'
      +locked.map(d=>realTile({id:d.id,icon:d.icon,description:CLASSIC_DESC[d.id]},'',true)).join('')+'</div></div>';

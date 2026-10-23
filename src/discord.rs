@@ -71,6 +71,22 @@ impl DiscordClient {
         Ok(v)
     }
 
+    /// Discord's own record of the user's play time: how many games it has
+    /// logged and the total seconds across them (Game Time / Game Variety badges).
+    pub fn fetch_play_stats(&self) -> Result<Value, String> {
+        if self.token.is_empty() {
+            return Err("no token".into());
+        }
+        let v: Value = ureq::get("https://discord.com/api/v9/users/@me/activities/statistics/applications")
+            .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
+            .set("X-Super-Properties", &quests::super_properties())
+            .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
+        let apps = v.as_array().map(Vec::as_slice).unwrap_or(&[]);
+        let played: Vec<&Value> = apps.iter().filter(|a| a["total_duration"].as_u64().unwrap_or(0) > 0).collect();
+        let secs: u64 = played.iter().map(|a| a["total_duration"].as_u64().unwrap_or(0)).sum();
+        Ok(json!({ "games": played.len(), "secs": secs }))
+    }
+
     pub fn fetch_quests(&self) -> Result<Vec<Quest>, String> {
         if let Some(e) = &self.token_err {
             return Err(e.clone());
