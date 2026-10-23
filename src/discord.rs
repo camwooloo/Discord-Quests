@@ -71,22 +71,6 @@ impl DiscordClient {
         Ok(v)
     }
 
-    /// Discord's own record of the user's play time: how many games it has
-    /// logged and the total seconds across them (Game Time / Game Variety badges).
-    pub fn fetch_play_stats(&self) -> Result<Value, String> {
-        if self.token.is_empty() {
-            return Err("no token".into());
-        }
-        let v: Value = ureq::get("https://discord.com/api/v9/users/@me/activities/statistics/applications")
-            .set("Authorization", &self.token).set("User-Agent", CLIENT_UA)
-            .set("X-Super-Properties", &quests::super_properties())
-            .call().map_err(|e| e.to_string())?.into_json().map_err(|e| e.to_string())?;
-        let apps = v.as_array().map(Vec::as_slice).unwrap_or(&[]);
-        let played: Vec<&Value> = apps.iter().filter(|a| a["total_duration"].as_u64().unwrap_or(0) > 0).collect();
-        let secs: u64 = played.iter().map(|a| a["total_duration"].as_u64().unwrap_or(0)).sum();
-        Ok(json!({ "games": played.len(), "secs": secs }))
-    }
-
     pub fn fetch_quests(&self) -> Result<Vec<Quest>, String> {
         if let Some(e) = &self.token_err {
             return Err(e.clone());
@@ -104,12 +88,31 @@ impl DiscordClient {
         // Discord snowflake epoch (2015-01-01) → account creation time.
         let created_ms = id.parse::<u64>().ok().map(|n| (n >> 22) + 1_420_070_400_000);
         let p = self.get_profile().unwrap_or(Value::Null);
+        let mut badges = p["badges"].clone();
+        // The tiered badges (Game Time / Variety / Streaming / Account Age) carry
+        // no tier in their id or text, only a different icon per tier. Inline
+        // those icons so the page can match them against its tier artwork
+        // (a data URI can be read back from a canvas; a CDN image can't).
+        for b in badges.as_array_mut().into_iter().flatten() {
+            let id = b["id"].as_str().unwrap_or("").to_lowercase();
+            if !["game", "stream", "age", "tier", "depth", "diversity"].iter().any(|k| id.contains(k)) {
+                continue;
+            }
+            let url = match (b["simple_icon_url"].as_str(), b["icon"].as_str()) {
+                (Some(u), _) if u.starts_with("https://") => u.to_string(),
+                (_, Some(h)) => format!("https://cdn.discordapp.com/badge-icons/{h}.png?size=64"),
+                _ => continue,
+            };
+            if let Some(uri) = fetch_data_uri(&url) {
+                b["iconData"] = Value::from(uri);
+            }
+        }
         Ok(json!({
             "publicFlags": me["public_flags"].as_u64().unwrap_or(0),
             "premiumType": me["premium_type"].as_u64().unwrap_or(0),
             "premiumGuildSince": p["premium_guild_since"].clone(),
             "createdMs": created_ms,
-            "badges": p["badges"].clone(),
+            "badges": badges,
         }))
     }
 
@@ -707,4 +710,18 @@ impl DiscordClient {
             Err(e) => Err(e.to_string()),
         }
     }
+}
+
+/// Download a small image and return it as a data URI.
+fn fetch_data_uri(url: &str) -> Option<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use std::io::Read;
+    let resp = ureq::get(url).set("User-Agent", CLIENT_UA).call().ok()?;
+    let mime = resp.content_type().to_string();
+    let mut bytes = Vec::new();
+    resp.into_reader().take(2 * 1024 * 1024).read_to_end(&mut bytes).ok()?;
+    if !mime.starts_with("image/") || bytes.is_empty() {
+        return None;
+    }
+    Some(format!("data:{mime};base64,{}", STANDARD.encode(bytes)))
 }
