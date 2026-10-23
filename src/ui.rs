@@ -1601,6 +1601,17 @@ function badgeTier(f,b){
   if(a){ const n=+a[1]; let t=1; f.need.forEach((v,i)=>{ if(n>=v) t=i+1; }); return t; }
   return 0; // earned, but nothing says which tier
 }
+// Discord's logged play time ({games, secs}) plus Aurora's streamed time.
+let PLAY_STATS=null;
+window.setPlayStats=function(p){ PLAY_STATS=p||null; if(NAV==='badges') render(); };
+function familyProgress(f){
+  const p=PLAY_STATS; if(!p) return '';
+  const h=s=>{ const x=(s||0)/3600; return (x>=10?Math.round(x).toLocaleString():x.toFixed(1))+' hours'; };
+  if(f.key==='time') return ' Discord has logged '+h(p.secs)+' of play.';
+  if(f.key==='variety') return ' Discord has logged '+(p.games||0).toLocaleString()+' games.';
+  if(f.key==='stream'&&p.streamSecs) return ' Aurora has seen you live for '+h(p.streamSecs)+'.';
+  return '';
+}
 function familyTier(f){
   const b=earnedBadges().find(f.match);
   if(!b) return {tier:0,badge:null};
@@ -1648,7 +1659,7 @@ function badgesHtml(){
     const intro=r.tier? ('You\'re on '+f.tiers[t-1][0]+' — tier '+t+' of 10.'+(t<10?' Next: '+f.tiers[t][0]+' at '+f.tiers[t][1]+'.':''))
       : f.key==='age'&&t? ('Your account is ~'+Math.floor(ay)+' years old, which is '+f.tiers[t-1][0]+' (tier '+t+' of 10).')
       : ('Not unlocked yet. '+f.unlock);
-    out+=tierFamily(f.title,f.emoji,intro,f.tiers,t,r.badge?badgeSrc(r.badge):null,f.img);
+    out+=tierFamily(f.title,f.emoji,intro+familyProgress(f),f.tiers,t,r.badge?badgeSrc(r.badge):null,f.img);
   });
   out+='<div class="bsec"><div class="bsec-h">Locked <span>'+locked.length+'</span></div><div class="bgrid">'
      +locked.map(d=>realTile({id:d.id,icon:d.icon,description:CLASSIC_DESC[d.id]},'',true)).join('')+'</div></div>';

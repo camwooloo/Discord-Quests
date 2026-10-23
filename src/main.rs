@@ -752,6 +752,12 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
               if let Ok(profile) = client.fetch_profile() {
                   let _ = proxy.send_event(UserEvent::Eval(format!("window.setBadges({profile})")));
               }
+              // Play totals + Aurora's streamed time for the Badges page progress lines.
+              let mut play = client.fetch_play_stats().unwrap_or(serde_json::Value::Null);
+              if play.is_object() {
+                  play["streamSecs"] = stream::snapshot()["streamSecs"].clone();
+              }
+              let _ = proxy.send_event(UserEvent::Eval(format!("window.setPlayStats&&window.setPlayStats({play})")));
               if let Ok(equipped) = client.fetch_equipped() {
                   let _ = proxy.send_event(UserEvent::Eval(format!("window.setEquipped({equipped})")));
               }
