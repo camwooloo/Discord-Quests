@@ -771,6 +771,8 @@ main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;z-i
 .farm-stream .act{width:auto;height:38px;padding:0 16px;flex:none;font-size:12.5px}
 .farm-stream .shint{flex-basis:100%;font-size:12.5px;color:var(--text-mute);font-weight:550;line-height:1.5}
 .farm-rows{display:flex;flex-direction:column;gap:6px}
+.reset-btn{width:auto;height:38px;padding:0 16px;flex:none;font-size:12.5px}
+.act.ghost.reset-btn.armed{background:rgba(244,63,94,.22);border-color:rgba(244,63,94,.7);color:#fecdd3}
 .farm-az{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:4px;padding:8px 0 10px;background:var(--bg-1)}
 .farm-az .chip{height:30px;min-width:28px;padding:0 7px;justify-content:center}
 .farm-az .chip:disabled{opacity:.35;pointer-events:none}
@@ -1079,6 +1081,10 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.4',d:'23 Oct 2026',notes:[
+    'Game quests now run the same small game window as badge farming, so Discord itself sees the game while the quest plays',
+    'Settings → Data → Reset stats clears your Aurora stats, History and farming totals (click twice to confirm)',
+  ]},
   {v:'0.6.3',d:'21 Oct 2026',notes:[
     'Badge farming now starts with the games you\'ve farmed least, so it doesn\'t begin with the same game every time',
     'The game list is split into Popular and A–Z sections, and every game in each section loads as you scroll',
@@ -2283,11 +2289,26 @@ function settingsHtml(){
      +'<div class="srow"><div class="txt"><div class="t">Show game on my profile</div><div class="d">While mimicking a game, broadcast it as your Discord status so it shows on your profile as if you were playing. On by default — turn off to keep it private.</div></div>'+sw('show_presence')+'</div>'
      +'<div class="srow"><div class="txt"><div class="t">Keep device awake</div><div class="d">Stop your computer from going to sleep while a video or game quest is running, so laptops don\'t interrupt quest farming. The screen can still turn off. Off by default.</div></div>'+sw('keep_awake')+'</div>'
    +'</div>'
+   +'<div class="sgroup"><h3>Data</h3>'
+     +'<div class="srow"><div class="txt"><div class="t">Reset stats</div><div class="d">Zero your orbs earned, quests completed, time farmed, History, badge farming hours and streamed time. Your settings, game list and orbs on Discord aren\'t touched.</div></div>'
+       +'<button class="act ghost reset-btn" id="resetStatsBtn" onclick="resetStats(this)">Reset stats</button></div>'
+   +'</div>'
    +'<div class="sgroup"><h3>About</h3>'
      +'<div class="srow"><div class="txt"><div class="t">Aurora Quests</div><div class="d">Reads the quests from your signed-in Discord client on this PC — nothing is sent anywhere else. Videos and games run in real time (a 30s quest takes 30s).</div></div></div>'
      +'<div class="srow"><div class="txt"><div class="t">⚠ Heads up</div><div class="d">This automates quest completion and presence using your Discord account token, which is against Discord\'s Terms of Service. It works on your own account, for your own rewards, but there is a small risk to your account — use at your own discretion.</div></div></div>'
    +'</div></div>'+settingsSide()+'</div>';
 }
+// Reset needs a second click within a few seconds.
+let resetArmT;
+function resetStats(btn){
+  if(!btn.classList.contains('armed')){
+    btn.classList.add('armed'); btn.textContent='Click again to reset';
+    clearTimeout(resetArmT); resetArmT=setTimeout(()=>{ btn.classList.remove('armed'); btn.textContent='Reset stats'; },4000);
+    return;
+  }
+  clearTimeout(resetArmT); btn.disabled=true; btn.textContent='Resetting…'; send('resetStats');
+}
+window.statsReset=function(){ toast('Stats reset'); if(NAV==='settings') render(); };
 let patchOpen={};
 function patchDefaultOpen(v){ return !!(CHANGELOG[0]&&CHANGELOG[0].v===v); }
 function togglePatch(v){ const cur=(patchOpen[v]!==undefined)?patchOpen[v]:patchDefaultOpen(v); patchOpen[v]=!cur; if(NAV==='settings') render(); }

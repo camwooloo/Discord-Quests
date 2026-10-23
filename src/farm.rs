@@ -300,6 +300,20 @@ pub fn games() -> Result<Vec<Game>, String> {
 }
 
 /// Compact list for the UI: `[{id,name,pop}]` (`pop` = popular rank or null).
+/// A detectable game by app id (for giving game quests a stand-in too).
+pub fn find_game(app_id: &str) -> Option<Game> {
+    games().ok()?.into_iter().find(|g| g.id == app_id)
+}
+
+/// Wipe farmed-time totals (keeps the user's list and settings).
+pub fn reset_totals() {
+    let mut c = load();
+    c.total_secs = 0;
+    c.played.clear();
+    c.per_game.clear();
+    save(&c);
+}
+
 pub fn games_json(games: &[Game]) -> String {
     let arr: Vec<Value> = games
         .iter()
@@ -486,7 +500,7 @@ html,body{{margin:0;height:100%;overflow:hidden;font-family:"Segoe UI",system-ui
 }
 
 /// Copy our binary to `<config>/farm/<app id>/<exe path>` and start it there.
-fn spawn_stub(game: &Game) -> Result<Child, String> {
+pub fn spawn_stub(game: &Game) -> Result<Child, String> {
     let me = std::env::current_exe().map_err(|e| e.to_string())?;
     let target = platform::config_dir()
         .join("farm")
@@ -533,7 +547,7 @@ fn spawn_stub(game: &Game) -> Result<Child, String> {
     cmd.spawn().map_err(|e| e.to_string())
 }
 
-fn kill(child: &mut Option<Child>) {
+pub fn kill(child: &mut Option<Child>) {
     if let Some(mut c) = child.take() {
         let _ = c.kill();
         let _ = c.wait();
