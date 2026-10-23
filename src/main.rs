@@ -402,6 +402,29 @@ fn handle_ipc(body: &str, ctx: &IpcCtx) {
             });
         }
         "clearPresence" => ctx.presence.clear(),
+        "resetStats" => {
+            // Settings > Reset stats (the UI asks for a second click first).
+            // The streak restarts from today rather than vanishing until tomorrow.
+            let old = stats::load();
+            let st = stats::Stats {
+                streak_days: old.streak_days.min(1),
+                last_open: old.last_open,
+                ..Default::default()
+            };
+            stats::save(&st);
+            history::clear();
+            farm::reset_totals();
+            stream::reset_totals();
+            if let Ok(js) = serde_json::to_string(&st) {
+                let _ = proxy.send_event(UserEvent::Eval(format!("window.setStats({js})")));
+            }
+            let _ = proxy.send_event(UserEvent::Eval("window.setHistory&&window.setHistory([])".into()));
+            if let Ok(js) = serde_json::to_string(&farm::load()) {
+                let _ = proxy.send_event(UserEvent::Eval(format!(
+                    "window.setFarmCfg&&window.setFarmCfg({js});window.statsReset&&window.statsReset()"
+                )));
+            }
+        }
         "farmLoad" => {
             // Detectable games + saved farm config for the Badge Farm page.
             let proxy = proxy.clone();
@@ -858,9 +881,18 @@ fn start_play(id: &str, ctx: &IpcCtx) {
     std::thread::spawn(move || {
         // Accept the quest first — heartbeats to an un-enrolled quest are rejected.
         let _ = client.enroll(&id);
+        // Run the farm's stand-in window as the game too, so Discord itself
+        // detects it (shows "Playing" and counts it), not just our heartbeats.
+        let game = farm::find_game(&app_id);
+        let mut stub = game.as_ref().and_then(|g| farm::spawn_stub(g).ok());
         loop {
             if stop.load(Ordering::SeqCst) {
                 break;
+            }
+            if let (Some(g), Some(c)) = (&game, stub.as_mut()) {
+                if let Ok(Some(_)) = c.try_wait() {
+                    stub = farm::spawn_stub(g).ok();
+                }
             }
             match client.play_heartbeat(&id, &app_id, &exe, false) {
                 Ok((prog, done)) => {
@@ -891,6 +923,7 @@ fn start_play(id: &str, ctx: &IpcCtx) {
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
         }
+        farm::kill(&mut stub);
         // Clear ourselves if we're still the active session.
         let mut p = player.lock().unwrap();
         if p.as_ref().map(|(pid, _)| pid == &id).unwrap_or(false) {

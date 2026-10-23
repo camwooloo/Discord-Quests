@@ -56,3 +56,8 @@ pub fn add(name: &str, category: &str, orbs: u64) -> Vec<Entry> {
     save(&v);
     v
 }
+
+/// Forget every logged quest (Settings > Reset stats).
+pub fn clear() {
+    save(&[]);
+}

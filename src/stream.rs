@@ -252,6 +252,15 @@ pub fn snapshot() -> Value {
     })
 }
 
+/// Wipe the streamed-time total (and restart the clock if live right now).
+pub fn reset_totals() {
+    save_stats(&Stats::default());
+    let mut v = voice().lock().unwrap();
+    if v.streaming_since.is_some() {
+        v.streaming_since = Some(Instant::now());
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The stream window
 // ---------------------------------------------------------------------------
