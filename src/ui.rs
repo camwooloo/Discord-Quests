@@ -1081,6 +1081,9 @@ let APP_VERSION='', changelogShown=false;
 let BADGE_IMGS={};
 // In-app patch notes (keep the top entry's version in sync with Cargo.toml).
 const CHANGELOG=[
+  {v:'0.6.6',d:'23 Oct 2026',notes:[
+    'Badges: Game Time, Game Variety and Streaming now read your tier from the badge\'s icon, so they match Discord instead of showing tier 1',
+  ]},
   {v:'0.6.5',d:'23 Oct 2026',notes:[
     'Badges: Game Time, Game Variety and Streaming now show the tier Discord gives you, with your hours or games and how many more you need for the next tier',
   ]},
@@ -1362,7 +1365,7 @@ function connBlock(){
 }
 window.setHistory=function(h){ HISTORY=h||[]; if(NAV==='history') render(); };
 window.setVersion=function(v){ ACK=true; APP_VERSION=v||''; maybeChangelog(); };
-window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); };
+window.setBadgeImgs=function(m){ BADGE_IMGS=m||{}; if(NAV==='badges') render(); matchBadgeTiers(); };
 window.setOrbImg=function(uri){ if(uri) document.documentElement.classList.add('orbimg'), document.documentElement.style.setProperty('--orb-img','url("'+uri+'")'); };
 window.setLogo=function(uri){ const m=byId('railMark'); if(m&&uri) m.innerHTML='<img src="'+uri+'" alt="Aurora">'; };
 window.noUpdate=function(){ toast('You\'re on the latest version'); };
@@ -1424,7 +1427,29 @@ window.updateAvailable=function(info){
 };
 window.updateFailed=function(e){ const el=byId('updbar'); if(el){ el.classList.remove('busy'); const g=el.querySelector('.upd-go'); if(g) g.textContent='Update now'; } toast('Update failed: '+esc(e)); };
 function doUpdate(){ const el=byId('updbar'); if(el){ el.classList.add('busy'); const g=el.querySelector('.upd-go'); if(g) g.textContent='Downloading…'; } send('applyUpdate'); }
-window.setBadges=function(p){ BADGES=p||null; if(NAV==='badges'||NAV==='home'||NAV==='profile') render(); };
+window.setBadges=function(p){ BADGES=p||null; if(NAV==='badges'||NAV==='home'||NAV==='profile') render(); matchBadgeTiers(); };
+// Tiered badges only differ by icon, so compare each one's icon with our ten
+// tier images (shrunk to a few pixels) and take the closest as its tier.
+function imgPixels(src){ return new Promise(res=>{ const im=new Image(); im.onload=()=>{ try{
+  const c=document.createElement('canvas'); c.width=c.height=16; const x=c.getContext('2d'); x.drawImage(im,0,0,16,16);
+  res(x.getImageData(0,0,16,16).data); }catch(e){ res(null); } }; im.onerror=()=>res(null); im.src=src; }); }
+async function matchBadgeTiers(){
+  let changed=false;
+  for(const f of TIERED){
+    const b=earnedBadges().find(f.match); if(!b||!b.iconData||b._tier) continue;
+    const mine=await imgPixels(b.iconData); if(!mine) continue;
+    let best=0, bestD=Infinity;
+    for(let i=1;i<=f.tiers.length;i++){
+      const src=BADGE_IMGS[f.img+i]; if(!src) continue;
+      const ref=await imgPixels(src); if(!ref) continue;
+      let d=0; for(let k=0;k<ref.length;k+=4){ const a=Math.min(ref[k+3],mine[k+3])/255;
+        d+=a*((ref[k]-mine[k])**2+(ref[k+1]-mine[k+1])**2+(ref[k+2]-mine[k+2])**2)+(ref[k+3]-mine[k+3])**2; }
+      if(d<bestD){ bestD=d; best=i; }
+    }
+    if(best){ b._tier=best; changed=true; }
+  }
+  if(changed&&(NAV==='badges'||NAV==='home'||NAV==='profile')) render();
+}
 window.setStats=function(s){ STATS=s||null; if(NAV==='home'||NAV==='profile') render(); };
 window.setOrbs=function(n){
   const el=byId('orbBal'); if(n==null) return;
@@ -1603,6 +1628,7 @@ function badgeAmount(f,b){
   return a?+a[1]:null;
 }
 function badgeTier(f,b){
+  if(b._tier) return b._tier; // matched from the icon (see matchBadgeTiers)
   // The amount is the most reliable: tier names can appear in other text and
   // the id's number isn't always the tier.
   const n=badgeAmount(f,b);
@@ -1612,14 +1638,12 @@ function badgeTier(f,b){
   const m=(b.id||'').match(/(\d+)$/); if(m){ const k=+m[1]; if(k>=1&&k<=f.tiers.length) return k; }
   return 0; // earned, but nothing says which tier
 }
-// Discord's logged play time ({games, secs}) plus Aurora's streamed time.
+// Aurora's streamed time ({streamSecs}) for the Streaming badge line.
 let PLAY_STATS=null;
 window.setPlayStats=function(p){ PLAY_STATS=p||null; if(NAV==='badges') render(); };
 function familyProgress(f){
   const p=PLAY_STATS; if(!p) return '';
   const h=s=>{ const x=(s||0)/3600; return (x>=10?Math.round(x).toLocaleString():x.toFixed(1))+' hours'; };
-  if(f.key==='time') return ' Discord has logged '+h(p.secs)+' of play.';
-  if(f.key==='variety') return ' Discord has logged '+(p.games||0).toLocaleString()+' games.';
   if(f.key==='stream'&&p.streamSecs) return ' Aurora has seen you live for '+h(p.streamSecs)+'.';
   return '';
 }
